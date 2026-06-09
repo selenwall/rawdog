@@ -266,22 +266,101 @@ const PARAMS = ['exposure','contrast','highlights','shadows','whites','blacks',
 // ─────────────────────────────────────────────────────────────────────────────
 // JPEG extraction from RAW container
 // ─────────────────────────────────────────────────────────────────────────────
-function extractJPEGs(buf) {
-  const u8 = new Uint8Array(buf);
-  const candidates = [];
-  for (let i = 0; i < u8.length - 3; i++) {
-    if (u8[i] === 0xFF && u8[i+1] === 0xD8) {
-      // find EOI
-      for (let j = i + 2; j < u8.length - 1; j++) {
-        if (u8[j] === 0xFF && u8[j+1] === 0xD9) {
-          candidates.push(buf.slice(i, j + 2));
-          i = j + 1;
-          break;
+
+// TIFF-based containers (ARW, DNG, NEF, CR2): walk the IFD chain and collect
+// embedded JPEG previews (JPEGInterchangeFormat tags and JPEG-compressed strips).
+function parseTIFFPreviews(buf) {
+  const dv = new DataView(buf);
+  if (buf.byteLength < 16) return [];
+  const order = dv.getUint16(0, false);
+  let le;
+  if (order === 0x4949) le = true;       // 'II' little-endian
+  else if (order === 0x4D4D) le = false; // 'MM' big-endian
+  else return [];
+
+  const found = [];
+  const seen = new Set();
+  function readIFD(off, depth) {
+    if (depth > 8 || off <= 0 || off + 2 > buf.byteLength || seen.has(off)) return;
+    seen.add(off);
+    const n = dv.getUint16(off, le);
+    if (n === 0 || n > 1000) return;
+    let jpgOff = -1, jpgLen = -1, stripOff = -1, stripLen = -1, comp = 0;
+    for (let k = 0; k < n; k++) {
+      const e = off + 2 + k*12;
+      if (e + 12 > buf.byteLength) return;
+      const tag   = dv.getUint16(e, le);
+      const type  = dv.getUint16(e+2, le);
+      const count = dv.getUint32(e+4, le);
+      const val   = type === 3 ? dv.getUint16(e+8, le) : dv.getUint32(e+8, le);
+      if      (tag === 0x0201) jpgOff = val;                 // JPEGInterchangeFormat
+      else if (tag === 0x0202) jpgLen = val;                 // ...Length
+      else if (tag === 0x0111 && count === 1) stripOff = val; // StripOffsets
+      else if (tag === 0x0117 && count === 1) stripLen = val; // StripByteCounts
+      else if (tag === 0x0103) comp = val;                   // Compression
+      else if (tag === 0x014A) {                             // SubIFDs
+        const ptr = count <= 1 ? e+8 : dv.getUint32(e+8, le);
+        for (let s = 0; s < Math.min(count, 8); s++) {
+          const at = count <= 1 ? ptr : ptr + s*4;
+          if (at + 4 <= buf.byteLength) readIFD(dv.getUint32(at, le), depth+1);
         }
       }
     }
+    if (jpgOff > 0 && jpgLen > 0 && jpgOff + jpgLen <= buf.byteLength)
+      found.push([jpgOff, jpgLen]);
+    if ((comp === 6 || comp === 7) && stripOff > 0 && stripLen > 0 && stripOff + stripLen <= buf.byteLength)
+      found.push([stripOff, stripLen]);
+    const nextAt = off + 2 + n*12;
+    if (nextAt + 4 <= buf.byteLength) readIFD(dv.getUint32(nextAt, le), depth+1);
   }
-  return candidates;
+  readIFD(dv.getUint32(4, le), 0);
+
+  const u8 = new Uint8Array(buf);
+  return found
+    .filter(([o]) => u8[o] === 0xFF && u8[o+1] === 0xD8)
+    .map(([o, l]) => buf.slice(o, o + l));
+}
+
+// Fuji RAF: "FUJIFILM" magic, preview JPEG offset/length at bytes 84/88 (big-endian)
+function parseRAFPreview(buf) {
+  if (buf.byteLength < 96) return [];
+  const u8 = new Uint8Array(buf);
+  const magic = 'FUJIFILM';
+  for (let k = 0; k < magic.length; k++) if (u8[k] !== magic.charCodeAt(k)) return [];
+  const dv = new DataView(buf);
+  const off = dv.getUint32(84, false), len = dv.getUint32(88, false);
+  if (off > 0 && len > 0 && off + len <= buf.byteLength && u8[off] === 0xFF && u8[off+1] === 0xD8)
+    return [buf.slice(off, off + len)];
+  return [];
+}
+
+// Fallback: scan for SOI…EOI spans. Depth-balanced so a preview's nested EXIF
+// thumbnail (a JPEG inside a JPEG) doesn't truncate the slice at the wrong EOI.
+function scanJPEGs(buf) {
+  const u8 = new Uint8Array(buf);
+  const out = [];
+  let i = 0;
+  while (i < u8.length - 3) {
+    if (u8[i] === 0xFF && u8[i+1] === 0xD8) {
+      let depth = 1, j = i + 2, end = -1;
+      while (j < u8.length - 1) {
+        if (u8[j] === 0xFF) {
+          const m = u8[j+1];
+          if (m === 0xD8) depth++;
+          else if (m === 0xD9 && --depth === 0) { end = j + 2; break; }
+        }
+        j++;
+      }
+      if (end > 0) { out.push(buf.slice(i, end)); i = end; continue; }
+    }
+    i++;
+  }
+  return out;
+}
+
+function extractJPEGs(buf) {
+  // structured parsers first (exact offsets), byte scan as fallback
+  return [...parseTIFFPreviews(buf), ...parseRAFPreview(buf), ...scanJPEGs(buf)];
 }
 
 function loadBestJPEG(candidates) {
