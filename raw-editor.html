@@ -94,12 +94,25 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
 #auto-btn{width:100%;padding:7px;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;font-size:12px;cursor:pointer;transition:background .15s}
 #auto-btn:hover{background:rgba(232,168,56,.12)}
 
-/* ── Export menu ── */
-#export-menu{position:fixed;display:none;z-index:50;background:#222;border:1px solid var(--border);border-radius:8px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.5);min-width:160px}
+/* ── Export dialog ── */
+#export-menu{position:fixed;display:none;z-index:50;background:#222;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.5);width:240px;padding:10px}
 #export-menu.open{display:block}
-.export-opt{display:block;width:100%;background:none;border:none;color:var(--text);padding:11px 14px;font-size:12px;text-align:left;cursor:pointer}
-.export-opt:hover{background:var(--border)}
-.export-opt small{color:var(--text-dim);margin-left:6px}
+.exp-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.exp-row>span{width:46px;font-size:11px;color:var(--text-dim);flex-shrink:0}
+.exp-btns{display:flex;gap:4px;flex:1}
+.exp-btns button{flex:1;background:none;border:1px solid var(--border);color:var(--text-dim);padding:5px 0;border-radius:4px;font-size:11px;cursor:pointer}
+.exp-btns button.active{border-color:var(--accent);color:var(--accent)}
+#exp-quality{flex:1;-webkit-appearance:none;appearance:none;height:20px;background:transparent;cursor:pointer;margin:0}
+#exp-quality::-webkit-slider-runnable-track{height:3px;background:var(--border);border-radius:2px}
+#exp-quality::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--text);margin-top:-5.5px}
+#exp-quality::-moz-range-track{height:3px;background:var(--border);border-radius:2px}
+#exp-quality::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--text);border:none}
+#exp-quality-val{width:24px;font-size:11px;text-align:right;color:var(--text-dim)}
+#export-go{width:100%;padding:8px;background:var(--accent);color:#000;border:none;border-radius:5px;font:600 12px system-ui,sans-serif;cursor:pointer}
+#export-go:hover{background:#d4922e}
+
+/* ── Color mixer ── */
+.mixer-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);margin:10px 0 6px}
 
 /* ── Presets ── */
 #presets-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:6px}
@@ -191,6 +204,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
           <div class="slider-row"><label>Tint</label><input type="range" id="s-tint" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-tint">0</span></div>
           <div class="slider-row"><label>Vibrance</label><input type="range" id="s-vibrance" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-vibrance">0</span></div>
           <div class="slider-row"><label>Saturation</label><input type="range" id="s-sat" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-sat">0</span></div>
+          <div class="mixer-label">Color mixer</div>
+          <div class="slider-row"><label style="color:#e06868">Red</label><input type="range" id="s-mixr" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixr">0</span></div>
+          <div class="slider-row"><label style="color:#d6c04a">Yellow</label><input type="range" id="s-mixy" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixy">0</span></div>
+          <div class="slider-row"><label style="color:#7ec850">Green</label><input type="range" id="s-mixg" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixg">0</span></div>
+          <div class="slider-row"><label style="color:#5bc8c8">Cyan</label><input type="range" id="s-mixc" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixc">0</span></div>
+          <div class="slider-row"><label style="color:#7a99e8">Blue</label><input type="range" id="s-mixb" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixb">0</span></div>
+          <div class="slider-row"><label style="color:#c878c8">Magenta</label><input type="range" id="s-mixm" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixm">0</span></div>
         </div>
         <div class="panel-page" id="page-curve">
           <canvas id="curve-canvas" width="220" height="220"></canvas>
@@ -249,8 +269,21 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
 </div>
 
 <div id="export-menu">
-  <button class="export-opt" data-fmt="jpeg">JPEG <small>smaller file</small></button>
-  <button class="export-opt" data-fmt="tiff">TIFF <small>lossless</small></button>
+  <div class="exp-row"><span>Format</span><div class="exp-btns">
+    <button class="exp-fmt active" data-fmt="jpeg">JPEG</button>
+    <button class="exp-fmt" data-fmt="tiff">TIFF</button>
+  </div></div>
+  <div class="exp-row"><span>Size</span><div class="exp-btns">
+    <button class="exp-size active" data-size="0">Full</button>
+    <button class="exp-size" data-size="3840">4K</button>
+    <button class="exp-size" data-size="1920">2K</button>
+    <button class="exp-size" data-size="1280">HD</button>
+  </div></div>
+  <div class="exp-row" id="exp-quality-row"><span>Quality</span>
+    <input type="range" id="exp-quality" min="50" max="100" step="1" value="92">
+    <span id="exp-quality-val">92</span>
+  </div>
+  <button id="export-go">Export JPEG</button>
 </div>
 
 <script>
@@ -262,9 +295,12 @@ const state = {
   // sliders
   exposure:0,contrast:0,highlights:0,shadows:0,whites:0,blacks:0,
   temp:0,tint:0,vibrance:0,sat:0,
+  mixr:0,mixy:0,mixg:0,mixc:0,mixb:0,mixm:0,
   sharpen:0,clarity:0,
   dehaze:0,vignette:0,grain:0,
   bw:0,
+  // split toning (set by film presets, not exposed as sliders)
+  splitShadow:[0,0,0], splitHigh:[0,0,0],
   // curve: array of {x,y} 0..1
   curvePoints:[{x:0,y:0},{x:1,y:1}],
   // crop/transform
@@ -285,7 +321,8 @@ let texCurrent = null;
 let histMode = 'rgb';
 
 const PARAMS = ['exposure','contrast','highlights','shadows','whites','blacks',
-  'temp','tint','vibrance','sat','sharpen','clarity','dehaze','vignette','grain','bw'];
+  'temp','tint','vibrance','sat','mixr','mixy','mixg','mixc','mixb','mixm',
+  'sharpen','clarity','dehaze','vignette','grain','bw'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // JPEG extraction from RAW container
@@ -437,6 +474,10 @@ uniform float u_dehaze;      // -1..1
 uniform float u_vignette;    // -1..1
 uniform float u_grain;       // 0..1
 uniform float u_bw;          // 0..1
+uniform vec3 u_mixA;         // per-band saturation: red, yellow, green (-1..1)
+uniform vec3 u_mixB;         // per-band saturation: cyan, blue, magenta (-1..1)
+uniform vec3 u_splitShadow;  // rgb tint applied to shadows (small values)
+uniform vec3 u_splitHigh;    // rgb tint applied to highlights
 // curve LUT (256 values packed into 16x16 texture coords via 1D approach)
 uniform sampler2D u_curve_lut;
 uniform vec2 u_texSize;
@@ -557,10 +598,42 @@ void main(){
     col = mix(gray, col, 1.0 + vibBoost);
   }
 
+  // ── Color mixer (per-hue-band saturation) ──
+  {
+    float mx2 = max(col.r, max(col.g, col.b));
+    float mn2 = min(col.r, min(col.g, col.b));
+    float dd  = mx2 - mn2;
+    if(dd > 0.004) {
+      float hue;
+      if(mx2 == col.r)      hue = mod((col.g - col.b) / dd, 6.0);
+      else if(mx2 == col.g) hue = (col.b - col.r) / dd + 2.0;
+      else                  hue = (col.r - col.g) / dd + 4.0;
+      // triangular weights around band centers R=0 Y=1 G=2 C=3 B=4 M=5
+      float wR = max(0., 1. - min(abs(hue - 0.), 6. - abs(hue - 0.)));
+      float wY = max(0., 1. - abs(hue - 1.));
+      float wG = max(0., 1. - abs(hue - 2.));
+      float wC = max(0., 1. - abs(hue - 3.));
+      float wB = max(0., 1. - abs(hue - 4.));
+      float wM = max(0., 1. - min(abs(hue - 5.), abs(hue + 1.)));
+      float satScale = 1.0 + wR*u_mixA.x + wY*u_mixA.y + wG*u_mixA.z
+                           + wC*u_mixB.x + wB*u_mixB.y + wM*u_mixB.z;
+      vec3 gray2 = vec3(luma(col));
+      col = clamp(gray2 + (col - gray2) * max(satScale, 0.0), 0., 1.);
+    }
+  }
+
   // ── B&W ──
   if(u_bw > 0.001) {
     float bwL = luma(col);
     col = mix(col, vec3(bwL), u_bw);
+  }
+
+  // ── Split toning (shadow / highlight tint) ──
+  {
+    float Ls = luma(col);
+    float sM = 1.0 - smoothstep(0.0, 0.55, Ls);
+    float hM = smoothstep(0.45, 1.0, Ls);
+    col = col * (vec3(1.0) + u_splitShadow * sM + u_splitHigh * hM);
   }
 
   col = clamp(col, 0., 1.);
@@ -708,6 +781,10 @@ function render() {
   gl.uniform1f(loc('u_vignette'),   s.vignette/100);
   gl.uniform1f(loc('u_grain'),      s.grain/100);
   gl.uniform1f(loc('u_bw'),         s.bw/100);
+  gl.uniform3f(loc('u_mixA'),       s.mixr/100, s.mixy/100, s.mixg/100);
+  gl.uniform3f(loc('u_mixB'),       s.mixc/100, s.mixb/100, s.mixm/100);
+  gl.uniform3fv(loc('u_splitShadow'), s.splitShadow);
+  gl.uniform3fv(loc('u_splitHigh'),   s.splitHigh);
   gl.uniform2f(loc('u_texSize'),    cropCanvas.width, cropCanvas.height);
   gl.uniform1f(loc('u_time'),       performance.now()/1000);
 
@@ -1148,19 +1225,32 @@ const PRESETS = [
   {name:'Punch',    group:'looks', s:{exposure:0,contrast:50,highlights:-30,shadows:20,whites:10,blacks:-20,temp:0,tint:0,vibrance:50,sat:30,sharpen:30,clarity:40,dehaze:20,vignette:-20,grain:0,bw:0}},
   {name:'Infrared', group:'looks', s:{exposure:.3,contrast:30,highlights:-10,shadows:10,whites:0,blacks:0,temp:-20,tint:10,vibrance:0,sat:-80,sharpen:20,clarity:30,dehaze:0,vignette:-10,grain:10,bw:80}},
 
-  // ── Fuji film simulations (approximations of the classic looks) ──
-  {name:'Provia',   group:'film', s:{exposure:0,contrast:12,highlights:-5,shadows:5,whites:0,blacks:0,temp:0,tint:0,vibrance:8,sat:4,sharpen:10,clarity:5,dehaze:0,vignette:0,grain:0,bw:0}},
-  {name:'Velvia',   group:'film', s:{exposure:0,contrast:28,highlights:-8,shadows:-5,whites:5,blacks:-8,temp:4,tint:2,vibrance:45,sat:22,sharpen:10,clarity:8,dehaze:5,vignette:0,grain:0,bw:0}},
-  {name:'Astia',    group:'film', s:{exposure:.05,contrast:-8,highlights:-15,shadows:12,whites:0,blacks:0,temp:3,tint:2,vibrance:18,sat:6,sharpen:5,clarity:0,dehaze:0,vignette:0,grain:0,bw:0}},
-  {name:'Classic Chrome', group:'film', s:{exposure:0,contrast:18,highlights:-12,shadows:-8,whites:0,blacks:5,temp:-6,tint:-4,vibrance:-10,sat:-28,sharpen:10,clarity:8,dehaze:0,vignette:-10,grain:8,bw:0},
-    curve:[{x:0,y:0.03},{x:1,y:0.97},{x:0.3,y:0.26},{x:0.75,y:0.78}]},
-  {name:'Classic Neg', group:'film', s:{exposure:0,contrast:22,highlights:-10,shadows:8,whites:-5,blacks:0,temp:6,tint:4,vibrance:-5,sat:-18,sharpen:10,clarity:10,dehaze:0,vignette:-8,grain:12,bw:0},
-    curve:[{x:0,y:0.05},{x:1,y:0.96},{x:0.35,y:0.3},{x:0.7,y:0.74}]},
-  {name:'Eterna',   group:'film', s:{exposure:.05,contrast:-18,highlights:-30,shadows:22,whites:-10,blacks:10,temp:0,tint:0,vibrance:-5,sat:-32,sharpen:5,clarity:-5,dehaze:0,vignette:-5,grain:8,bw:0},
-    curve:[{x:0,y:0.04},{x:1,y:0.93}]},
-  {name:'Acros',    group:'film', s:{exposure:0,contrast:18,highlights:-8,shadows:5,whites:0,blacks:-5,temp:0,tint:0,vibrance:0,sat:0,sharpen:15,clarity:12,dehaze:0,vignette:-10,grain:18,bw:100}},
-  {name:'Nostalgic Neg', group:'film', s:{exposure:.05,contrast:8,highlights:-12,shadows:18,whites:0,blacks:5,temp:12,tint:3,vibrance:0,sat:-12,sharpen:5,clarity:0,dehaze:0,vignette:-5,grain:10,bw:0},
-    curve:[{x:0,y:0.04},{x:1,y:0.97}]},
+  // ── Fuji film simulations ──
+  // Tuned to documented characteristics (fujifilm-x.com, Fuji X Weekly, FujiLove,
+  // jmpeltier.com): Provia neutral; Velvia high contrast + saturation with rich
+  // greens/blues/reds; Astia soft flattened highlights, faster shadow falloff;
+  // Classic Chrome desaturated + contrasty shadows but blues kept vibrant and
+  // cool; Classic Neg (Superia 100) warm with cyan-green shadows, warm-magenta
+  // highlights, strong highlight contrast, cool colors muted more than reds;
+  // Eterna flat and understated; Acros deep blacks with rich transitions;
+  // Nostalgic Neg amber highlights with rich shadows.
+  {name:'Provia',   group:'film', s:{contrast:10,highlights:-5,shadows:3,vibrance:6,sat:3,sharpen:8,clarity:3}},
+  {name:'Velvia',   group:'film', s:{contrast:32,highlights:-5,shadows:-8,whites:5,blacks:-10,temp:2,vibrance:42,sat:25,mixr:8,mixg:12,mixb:12,sharpen:10,clarity:6}},
+  {name:'Astia',    group:'film', s:{exposure:.05,contrast:5,highlights:-20,shadows:-5,whites:-5,temp:2,tint:1,vibrance:16,sat:8,sharpen:5},
+    curve:[{x:0,y:0},{x:1,y:0.97},{x:0.25,y:0.2},{x:0.75,y:0.78}]},
+  {name:'Classic Chrome', group:'film', s:{contrast:15,highlights:-8,shadows:-15,blacks:5,temp:-5,tint:-2,vibrance:-8,sat:-30,mixr:-15,mixy:-15,mixg:-12,mixc:8,mixb:10,sharpen:8,clarity:6,grain:6},
+    split:{shadow:[-0.01,0,0.02],high:[0,0,0]},
+    curve:[{x:0,y:0},{x:1,y:0.97},{x:0.22,y:0.16},{x:0.6,y:0.6}]},
+  {name:'Classic Neg', group:'film', s:{contrast:22,highlights:-5,shadows:5,temp:8,tint:3,sat:-12,mixr:5,mixy:-15,mixg:-10,mixc:-20,mixb:-20,sharpen:8,clarity:6,grain:12},
+    split:{shadow:[-0.035,0.015,0.025],high:[0.045,0,-0.01]},
+    curve:[{x:0,y:0.02},{x:1,y:0.98},{x:0.3,y:0.24},{x:0.8,y:0.85}]},
+  {name:'Eterna',   group:'film', s:{contrast:-22,highlights:-30,shadows:18,sat:-35,vibrance:-5,sharpen:3,clarity:-5,grain:5},
+    curve:[{x:0,y:0.05},{x:1,y:0.92}]},
+  {name:'Acros',    group:'film', s:{contrast:20,highlights:-8,shadows:5,blacks:-10,sharpen:14,clarity:10,grain:15,vignette:-8,bw:100},
+    curve:[{x:0,y:0},{x:1,y:1},{x:0.25,y:0.21},{x:0.75,y:0.79}]},
+  {name:'Nostalgic Neg', group:'film', s:{contrast:10,highlights:-10,shadows:14,blacks:-5,temp:10,tint:2,vibrance:5,sat:-8,mixr:5,mixy:8,mixb:-10,sharpen:5,grain:8},
+    split:{shadow:[0,0,0.01],high:[0.06,0.025,-0.035]},
+    curve:[{x:0,y:0.02},{x:1,y:0.97}]},
 ];
 
 let activePreset = 0;
@@ -1256,7 +1346,8 @@ function prepareThumbSource() {
 function renderPresetThumb(canvas, preset) {
   const tc = thumbCtx;
   if (!tc || !cropCanvas) return;
-  const presetState = preset.s;
+  const presetState = {};
+  for (const k of PARAMS) presetState[k] = preset.s[k] ?? 0;
   const g = tc.gl;
   const loc = n => g.getUniformLocation(tc.prog, n);
   // per-preset tone curve
@@ -1279,6 +1370,10 @@ function renderPresetThumb(canvas, preset) {
   g.uniform1f(loc('u_vignette'),presetState.vignette/100);
   g.uniform1f(loc('u_grain'),presetState.grain/100);
   g.uniform1f(loc('u_bw'),presetState.bw/100);
+  g.uniform3f(loc('u_mixA'),(presetState.mixr??0)/100,(presetState.mixy??0)/100,(presetState.mixg??0)/100);
+  g.uniform3f(loc('u_mixB'),(presetState.mixc??0)/100,(presetState.mixb??0)/100,(presetState.mixm??0)/100);
+  g.uniform3fv(loc('u_splitShadow'), preset.split ? preset.split.shadow : [0,0,0]);
+  g.uniform3fv(loc('u_splitHigh'),   preset.split ? preset.split.high   : [0,0,0]);
   g.uniform2f(loc('u_texSize'),tc.srcW,tc.srcH);
   g.uniform1f(loc('u_time'),0);
   g.viewport(0,0,tc.canvas.width,tc.canvas.height);
@@ -1294,6 +1389,8 @@ function applyPreset(i) {
   const p = preset.s;
   for (const k of PARAMS) { state[k] = p[k] ?? 0; }
   state.curvePoints = preset.curve ? JSON.parse(JSON.stringify(preset.curve)) : [{x:0,y:0},{x:1,y:1}];
+  state.splitShadow = preset.split ? preset.split.shadow.slice() : [0,0,0];
+  state.splitHigh   = preset.split ? preset.split.high.slice()   : [0,0,0];
   activePreset = i;
   // update sliders
   for (const k of PARAMS) {
@@ -1527,9 +1624,10 @@ async function loadFile(file) {
   overlay.classList.add('hidden');
 
   // reset state
-  Object.assign(state, {rotation:0,flipH:false,flipV:false,straighten:0,
-    exposure:0,contrast:0,highlights:0,shadows:0,whites:0,blacks:0,
-    temp:0,tint:0,vibrance:0,sat:0,sharpen:0,clarity:0,dehaze:0,vignette:0,grain:0,bw:0});
+  Object.assign(state, {rotation:0,flipH:false,flipV:false,straighten:0});
+  for (const k of PARAMS) state[k] = 0;
+  state.splitShadow = [0,0,0];
+  state.splitHigh   = [0,0,0];
   state.curvePoints = [{x:0,y:0},{x:1,y:1}];
 
   // reset sliders UI
@@ -1612,20 +1710,32 @@ function downloadBlob(blob, name) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
+  document.body.appendChild(a); // some mobile browsers ignore clicks on detached anchors
   a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 30000);
 }
 
-function exportImage(format = 'jpeg') {
+function exportImage(format = 'jpeg', maxEdge = 0, quality = 92) {
   if (!cropCanvas || !gl) return;
-  const MAX = 4096;
   const iw = cropCanvas.width, ih = cropCanvas.height;
-  const scale = Math.min(1, MAX/Math.max(iw,ih));
-  const ew = Math.round(iw*scale), eh = Math.round(ih*scale);
+  const scale = maxEdge ? Math.min(1, maxEdge/Math.max(iw,ih)) : 1;
+  const ew = Math.max(1, Math.round(iw*scale)), eh = Math.max(1, Math.round(ih*scale));
 
-  // render to FBO
+  // downscale the source first (better filtering than GPU minification)
+  let src = cropCanvas;
+  if (scale < 1) {
+    const sc = document.createElement('canvas');
+    sc.width = ew; sc.height = eh;
+    sc.getContext('2d').drawImage(cropCanvas, 0, 0, ew, eh);
+    src = sc;
+  }
+
+  // render to FBO — keep unit 0 for textures we create here; unit 1 must stay
+  // bound to the curve LUT or the shader samples its own render target
   const fbo = gl.createFramebuffer();
   const rTex = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, rTex);
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,ew,eh,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
@@ -1633,15 +1743,19 @@ function exportImage(format = 'jpeg') {
   gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
   gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,rTex,0);
 
-  // re-upload full-size texture
+  // upload the (possibly downscaled) source on unit 0
   const bigTex = gl.createTexture();
-  gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, bigTex);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,cropCanvas);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,src);
+
+  // make sure the curve LUT is on unit 1
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, texLUT);
+  gl.activeTexture(gl.TEXTURE0);
 
   gl.viewport(0,0,ew,eh);
   gl.uniform2f(gl.getUniformLocation(glProgram,'u_texSize'),ew,eh);
@@ -1674,7 +1788,7 @@ function exportImage(format = 'jpeg') {
   const outCanvas = document.createElement('canvas');
   outCanvas.width=ew; outCanvas.height=eh;
   outCanvas.getContext('2d').putImageData(new ImageData(flipped,ew,eh),0,0);
-  outCanvas.toBlob(blob => downloadBlob(blob, 'safelight-edit.jpg'), 'image/jpeg', 0.92);
+  outCanvas.toBlob(blob => downloadBlob(blob, 'safelight-edit.jpg'), 'image/jpeg', quality/100);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1692,7 +1806,9 @@ function startCompare() {
   hint.style.display='block';
   // set all adjustments to 0
   const saved = {};
-  for (const k of PARAMS) { saved[k]=state[k]; state[k]=k==='exposure'?0:0; }
+  for (const k of PARAMS) { saved[k]=state[k]; state[k]=0; }
+  state.splitShadow = [0,0,0];
+  state.splitHigh   = [0,0,0];
   state.curvePoints = [{x:0,y:0},{x:1,y:1}];
   uploadLUT(buildCurveLUT(state.curvePoints));
   scheduleRender();
@@ -1821,6 +1937,8 @@ function init() {
       const vl=document.getElementById('v-'+k);
       if(el) el.value=0; if(vl) vl.textContent='0';
     }
+    state.splitShadow=[0,0,0];
+    state.splitHigh=[0,0,0];
     state.curvePoints=[{x:0,y:0},{x:1,y:1}];
     drawCurve();
     uploadLUT(buildCurveLUT(state.curvePoints));
@@ -1832,8 +1950,9 @@ function init() {
   // Auto adjust
   document.getElementById('auto-btn').addEventListener('click', applyAuto);
 
-  // Export format menu
+  // Export dialog
   const exportMenu = document.getElementById('export-menu');
+  let expFmt = 'jpeg', expSize = 0;
   document.getElementById('export-btn').addEventListener('click', e => {
     e.stopPropagation();
     if (exportMenu.classList.contains('open')) { exportMenu.classList.remove('open'); return; }
@@ -1844,11 +1963,25 @@ function init() {
     exportMenu.style.top  = (r.bottom + 6 + mh > window.innerHeight ? r.top - 6 - mh : r.bottom + 6) + 'px';
   });
   document.addEventListener('click', () => exportMenu.classList.remove('open'));
-  document.querySelectorAll('.export-opt').forEach(b => b.addEventListener('click', e => {
-    e.stopPropagation();
-    exportMenu.classList.remove('open');
-    exportImage(b.dataset.fmt);
+  exportMenu.addEventListener('click', e => e.stopPropagation());
+  document.querySelectorAll('.exp-fmt').forEach(b => b.addEventListener('click', () => {
+    expFmt = b.dataset.fmt;
+    document.querySelectorAll('.exp-fmt').forEach(x => x.classList.toggle('active', x === b));
+    document.getElementById('exp-quality-row').style.display = expFmt === 'jpeg' ? '' : 'none';
+    document.getElementById('export-go').textContent = 'Export ' + expFmt.toUpperCase();
   }));
+  document.querySelectorAll('.exp-size').forEach(b => b.addEventListener('click', () => {
+    expSize = parseInt(b.dataset.size, 10);
+    document.querySelectorAll('.exp-size').forEach(x => x.classList.toggle('active', x === b));
+  }));
+  const expQ = document.getElementById('exp-quality');
+  expQ.addEventListener('input', () => {
+    document.getElementById('exp-quality-val').textContent = expQ.value;
+  });
+  document.getElementById('export-go').addEventListener('click', () => {
+    exportMenu.classList.remove('open');
+    exportImage(expFmt, expSize, parseInt(expQ.value, 10));
+  });
 
   // ── Zoom & pan ──
   const area = document.getElementById('canvas-area');
