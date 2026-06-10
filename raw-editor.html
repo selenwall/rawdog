@@ -14,7 +14,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
 
 /* ── Layout: image on top (always visible), control sheet below ── */
 #app{display:flex;flex-direction:column;height:100vh;height:100dvh}
-#canvas-area{flex:1;min-height:0;position:relative;overflow:hidden;background:#0a0a0a;display:flex;align-items:center;justify-content:center}
+#canvas-area{flex:1;min-height:0;position:relative;overflow:hidden;background:#0a0a0a;display:flex;align-items:center;justify-content:center;touch-action:none}
 #main-canvas{display:block;max-width:100%;max-height:100%;object-fit:contain;cursor:crosshair}
 #sidebar{flex-shrink:0;display:flex;flex-direction:column;max-height:48vh;background:var(--panel);border-top:1px solid var(--border)}
 #panel-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:env(safe-area-inset-bottom)}
@@ -89,8 +89,22 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
 .hist-btn{background:none;border:1px solid var(--border);color:var(--text-dim);padding:2px 8px;border-radius:3px;font-size:11px;cursor:pointer}
 .hist-btn.active{border-color:var(--accent);color:var(--accent)}
 
+/* ── Auto adjust ── */
+#auto-row{padding:8px 10px 0}
+#auto-btn{width:100%;padding:7px;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;font-size:12px;cursor:pointer;transition:background .15s}
+#auto-btn:hover{background:rgba(232,168,56,.12)}
+
+/* ── Export menu ── */
+#export-menu{position:fixed;display:none;z-index:50;background:#222;border:1px solid var(--border);border-radius:8px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.5);min-width:160px}
+#export-menu.open{display:block}
+.export-opt{display:block;width:100%;background:none;border:none;color:var(--text);padding:11px 14px;font-size:12px;text-align:left;cursor:pointer}
+.export-opt:hover{background:var(--border)}
+.export-opt small{color:var(--text-dim);margin-left:6px}
+
 /* ── Presets ── */
 #presets-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:6px}
+.preset-group-label{grid-column:1/-1;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);margin:6px 0 0}
+.preset-group-label:first-child{margin-top:0}
 .preset-item{cursor:pointer;border-radius:4px;overflow:hidden;border:2px solid transparent;transition:border-color .15s}
 .preset-item:hover{border-color:var(--text-dim)}
 .preset-item.active{border-color:var(--accent)}
@@ -154,6 +168,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
     <div id="panel-scroll">
       <!-- Edit panel: tabbed sections -->
       <div id="edit-panel">
+        <div id="auto-row"><button id="auto-btn" title="Automatic exposure, white balance and color">✦ Auto adjust</button></div>
         <div id="section-tabs">
           <button class="sec-tab active" data-sec="light">Light</button>
           <button class="sec-tab" data-sec="color">Color</button>
@@ -231,6 +246,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
       </div>
     </div>
   </div>
+</div>
+
+<div id="export-menu">
+  <button class="export-opt" data-fmt="jpeg">JPEG <small>smaller file</small></button>
+  <button class="export-opt" data-fmt="tiff">TIFF <small>lossless</small></button>
 </div>
 
 <script>
@@ -774,6 +794,7 @@ function refreshTexture() {
   uploadTexture(cropCanvas);
   uploadLUT(buildCurveLUT(state.curvePoints));
   fitCanvas();
+  resetView();
   scheduleRender();
 }
 
@@ -925,12 +946,19 @@ function curvePointAt(cx, mx, my) {
   return -1;
 }
 
+function pointerPos(e) {
+  // touchend has an empty `touches` list — fall back to changedTouches
+  if (e.touches && e.touches.length) return e.touches[0];
+  if (e.changedTouches && e.changedTouches.length) return e.changedTouches[0];
+  return e;
+}
+
 function curveEvent(e, type) {
   const canvas = document.getElementById('curve-canvas');
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width  / rect.width;
   const scaleY = canvas.height / rect.height;
-  const touch  = e.touches ? e.touches[0] : e;
+  const touch  = pointerPos(e);
   const mx = (touch.clientX - rect.left)  * scaleX;
   const my = (touch.clientY - rect.top)   * scaleY;
   const nx = Math.max(0,Math.min(1, mx / canvas.width));
@@ -1027,7 +1055,7 @@ function cropPointerEvent(e, type) {
   if (!cropCanvas) return;
   const area = document.getElementById('canvas-area');
   const ar   = area.getBoundingClientRect();
-  const touch = e.touches ? e.touches[0] : e;
+  const touch = pointerPos(e);
   const mx = touch.clientX - ar.left;
   const my = touch.clientY - ar.top;
   const ir = getImageRect();
@@ -1109,16 +1137,30 @@ function resetCrop() {
 // Presets
 // ─────────────────────────────────────────────────────────────────────────────
 const PRESETS = [
-  {name:'Original', s:{exposure:0,contrast:0,highlights:0,shadows:0,whites:0,blacks:0,temp:0,tint:0,vibrance:0,sat:0,sharpen:0,clarity:0,dehaze:0,vignette:0,grain:0,bw:0}},
-  {name:'Vivid',    s:{exposure:.2,contrast:30,highlights:-20,shadows:20,whites:10,blacks:-10,temp:10,tint:0,vibrance:40,sat:20,sharpen:20,clarity:20,dehaze:0,vignette:0,grain:0,bw:0}},
-  {name:'Matte',    s:{exposure:.1,contrast:-20,highlights:-30,shadows:30,whites:-20,blacks:20,temp:5,tint:0,vibrance:10,sat:-10,sharpen:0,clarity:-10,dehaze:0,vignette:-20,grain:15,bw:0}},
-  {name:'Cinema',   s:{exposure:0,contrast:20,highlights:-40,shadows:20,whites:-10,blacks:10,temp:-5,tint:0,vibrance:-10,sat:-20,sharpen:10,clarity:30,dehaze:0,vignette:-40,grain:20,bw:0}},
-  {name:'B&W Film', s:{exposure:.1,contrast:25,highlights:-15,shadows:15,whites:0,blacks:0,temp:0,tint:0,vibrance:0,sat:0,sharpen:15,clarity:20,dehaze:0,vignette:-30,grain:25,bw:100}},
-  {name:'Golden Hr',s:{exposure:.3,contrast:15,highlights:-10,shadows:30,whites:5,blacks:-5,temp:40,tint:5,vibrance:30,sat:15,sharpen:10,clarity:10,dehaze:10,vignette:-15,grain:5,bw:0}},
-  {name:'Cool Blue', s:{exposure:.1,contrast:10,highlights:-10,shadows:10,whites:0,blacks:0,temp:-30,tint:-5,vibrance:20,sat:5,sharpen:10,clarity:10,dehaze:0,vignette:-10,grain:0,bw:0}},
-  {name:'Faded',    s:{exposure:.2,contrast:-30,highlights:20,shadows:30,whites:20,blacks:30,temp:5,tint:0,vibrance:-20,sat:-30,sharpen:0,clarity:-20,dehaze:0,vignette:0,grain:20,bw:0}},
-  {name:'Punch',    s:{exposure:0,contrast:50,highlights:-30,shadows:20,whites:10,blacks:-20,temp:0,tint:0,vibrance:50,sat:30,sharpen:30,clarity:40,dehaze:20,vignette:-20,grain:0,bw:0}},
-  {name:'Infrared', s:{exposure:.3,contrast:30,highlights:-10,shadows:10,whites:0,blacks:0,temp:-20,tint:10,vibrance:0,sat:-80,sharpen:20,clarity:30,dehaze:0,vignette:-10,grain:10,bw:80}},
+  {name:'Original', group:'looks', s:{exposure:0,contrast:0,highlights:0,shadows:0,whites:0,blacks:0,temp:0,tint:0,vibrance:0,sat:0,sharpen:0,clarity:0,dehaze:0,vignette:0,grain:0,bw:0}},
+  {name:'Vivid',    group:'looks', s:{exposure:.2,contrast:30,highlights:-20,shadows:20,whites:10,blacks:-10,temp:10,tint:0,vibrance:40,sat:20,sharpen:20,clarity:20,dehaze:0,vignette:0,grain:0,bw:0}},
+  {name:'Matte',    group:'looks', s:{exposure:.1,contrast:-20,highlights:-30,shadows:30,whites:-20,blacks:20,temp:5,tint:0,vibrance:10,sat:-10,sharpen:0,clarity:-10,dehaze:0,vignette:-20,grain:15,bw:0}},
+  {name:'Cinema',   group:'looks', s:{exposure:0,contrast:20,highlights:-40,shadows:20,whites:-10,blacks:10,temp:-5,tint:0,vibrance:-10,sat:-20,sharpen:10,clarity:30,dehaze:0,vignette:-40,grain:20,bw:0}},
+  {name:'B&W Film', group:'looks', s:{exposure:.1,contrast:25,highlights:-15,shadows:15,whites:0,blacks:0,temp:0,tint:0,vibrance:0,sat:0,sharpen:15,clarity:20,dehaze:0,vignette:-30,grain:25,bw:100}},
+  {name:'Golden Hr',group:'looks', s:{exposure:.3,contrast:15,highlights:-10,shadows:30,whites:5,blacks:-5,temp:40,tint:5,vibrance:30,sat:15,sharpen:10,clarity:10,dehaze:10,vignette:-15,grain:5,bw:0}},
+  {name:'Cool Blue',group:'looks', s:{exposure:.1,contrast:10,highlights:-10,shadows:10,whites:0,blacks:0,temp:-30,tint:-5,vibrance:20,sat:5,sharpen:10,clarity:10,dehaze:0,vignette:-10,grain:0,bw:0}},
+  {name:'Faded',    group:'looks', s:{exposure:.2,contrast:-30,highlights:20,shadows:30,whites:20,blacks:30,temp:5,tint:0,vibrance:-20,sat:-30,sharpen:0,clarity:-20,dehaze:0,vignette:0,grain:20,bw:0}},
+  {name:'Punch',    group:'looks', s:{exposure:0,contrast:50,highlights:-30,shadows:20,whites:10,blacks:-20,temp:0,tint:0,vibrance:50,sat:30,sharpen:30,clarity:40,dehaze:20,vignette:-20,grain:0,bw:0}},
+  {name:'Infrared', group:'looks', s:{exposure:.3,contrast:30,highlights:-10,shadows:10,whites:0,blacks:0,temp:-20,tint:10,vibrance:0,sat:-80,sharpen:20,clarity:30,dehaze:0,vignette:-10,grain:10,bw:80}},
+
+  // ── Fuji film simulations (approximations of the classic looks) ──
+  {name:'Provia',   group:'film', s:{exposure:0,contrast:12,highlights:-5,shadows:5,whites:0,blacks:0,temp:0,tint:0,vibrance:8,sat:4,sharpen:10,clarity:5,dehaze:0,vignette:0,grain:0,bw:0}},
+  {name:'Velvia',   group:'film', s:{exposure:0,contrast:28,highlights:-8,shadows:-5,whites:5,blacks:-8,temp:4,tint:2,vibrance:45,sat:22,sharpen:10,clarity:8,dehaze:5,vignette:0,grain:0,bw:0}},
+  {name:'Astia',    group:'film', s:{exposure:.05,contrast:-8,highlights:-15,shadows:12,whites:0,blacks:0,temp:3,tint:2,vibrance:18,sat:6,sharpen:5,clarity:0,dehaze:0,vignette:0,grain:0,bw:0}},
+  {name:'Classic Chrome', group:'film', s:{exposure:0,contrast:18,highlights:-12,shadows:-8,whites:0,blacks:5,temp:-6,tint:-4,vibrance:-10,sat:-28,sharpen:10,clarity:8,dehaze:0,vignette:-10,grain:8,bw:0},
+    curve:[{x:0,y:0.03},{x:1,y:0.97},{x:0.3,y:0.26},{x:0.75,y:0.78}]},
+  {name:'Classic Neg', group:'film', s:{exposure:0,contrast:22,highlights:-10,shadows:8,whites:-5,blacks:0,temp:6,tint:4,vibrance:-5,sat:-18,sharpen:10,clarity:10,dehaze:0,vignette:-8,grain:12,bw:0},
+    curve:[{x:0,y:0.05},{x:1,y:0.96},{x:0.35,y:0.3},{x:0.7,y:0.74}]},
+  {name:'Eterna',   group:'film', s:{exposure:.05,contrast:-18,highlights:-30,shadows:22,whites:-10,blacks:10,temp:0,tint:0,vibrance:-5,sat:-32,sharpen:5,clarity:-5,dehaze:0,vignette:-5,grain:8,bw:0},
+    curve:[{x:0,y:0.04},{x:1,y:0.93}]},
+  {name:'Acros',    group:'film', s:{exposure:0,contrast:18,highlights:-8,shadows:5,whites:0,blacks:-5,temp:0,tint:0,vibrance:0,sat:0,sharpen:15,clarity:12,dehaze:0,vignette:-10,grain:18,bw:100}},
+  {name:'Nostalgic Neg', group:'film', s:{exposure:.05,contrast:8,highlights:-12,shadows:18,whites:0,blacks:5,temp:12,tint:3,vibrance:0,sat:-12,sharpen:5,clarity:0,dehaze:0,vignette:-5,grain:10,bw:0},
+    curve:[{x:0,y:0.04},{x:1,y:0.97}]},
 ];
 
 let activePreset = 0;
@@ -1127,14 +1169,23 @@ function buildPresetThumbs() {
   const grid = document.getElementById('presets-grid');
   grid.innerHTML = '';
   prepareThumbSource();
+  const groupNames = {looks:'Looks', film:'Fuji Film Simulations'};
+  let lastGroup = null;
   PRESETS.forEach((preset, i) => {
+    if (preset.group !== lastGroup) {
+      lastGroup = preset.group;
+      const lbl = document.createElement('div');
+      lbl.className = 'preset-group-label';
+      lbl.textContent = groupNames[preset.group] || preset.group;
+      grid.appendChild(lbl);
+    }
     const div = document.createElement('div');
     div.className = 'preset-item' + (i===0?' active':'');
     div.dataset.idx = i;
 
     const thumb = document.createElement('canvas');
     thumb.width = 64; thumb.height = 64;
-    renderPresetThumb(thumb, preset.s);
+    renderPresetThumb(thumb, preset);
 
     const label = document.createElement('span');
     label.textContent = preset.name;
@@ -1202,11 +1253,16 @@ function prepareThumbSource() {
   tc.srcW = small.width; tc.srcH = small.height;
 }
 
-function renderPresetThumb(canvas, presetState) {
+function renderPresetThumb(canvas, preset) {
   const tc = thumbCtx;
   if (!tc || !cropCanvas) return;
+  const presetState = preset.s;
   const g = tc.gl;
   const loc = n => g.getUniformLocation(tc.prog, n);
+  // per-preset tone curve
+  const lut = buildCurveLUT(preset.curve || [{x:0,y:0},{x:1,y:1}]);
+  g.activeTexture(g.TEXTURE1); g.bindTexture(g.TEXTURE_2D, tc.texL);
+  g.texImage2D(g.TEXTURE_2D,0,g.LUMINANCE,256,1,0,g.LUMINANCE,g.UNSIGNED_BYTE,lut);
   g.uniform1f(loc('u_exposure'),presetState.exposure);
   g.uniform1f(loc('u_contrast'),presetState.contrast/100);
   g.uniform1f(loc('u_highlights'),presetState.highlights/100);
@@ -1234,8 +1290,10 @@ function renderPresetThumb(canvas, presetState) {
 }
 
 function applyPreset(i) {
-  const p = PRESETS[i].s;
+  const preset = PRESETS[i];
+  const p = preset.s;
   for (const k of PARAMS) { state[k] = p[k] ?? 0; }
+  state.curvePoints = preset.curve ? JSON.parse(JSON.stringify(preset.curve)) : [{x:0,y:0},{x:1,y:1}];
   activePreset = i;
   // update sliders
   for (const k of PARAMS) {
@@ -1245,8 +1303,120 @@ function applyPreset(i) {
     if (vl) { vl.textContent = formatVal(k, state[k]); }
   }
   document.querySelectorAll('.preset-item').forEach((d,j)=>d.classList.toggle('active',j===i));
+  drawCurve();
   uploadLUT(buildCurveLUT(state.curvePoints));
   scheduleRender();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auto adjust (exposure, white balance, color)
+// ─────────────────────────────────────────────────────────────────────────────
+function computeAuto() {
+  if (!cropCanvas) return null;
+  const s = 128 / Math.max(cropCanvas.width, cropCanvas.height);
+  const w = Math.max(1, Math.round(cropCanvas.width  * s));
+  const h = Math.max(1, Math.round(cropCanvas.height * s));
+  const oc = document.createElement('canvas');
+  oc.width = w; oc.height = h;
+  const ctx = oc.getContext('2d', {willReadFrequently:true});
+  ctx.drawImage(cropCanvas, 0, 0, w, h);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  const n = w * h;
+
+  let rs = 0, gs = 0, bs = 0, satSum = 0;
+  const lumas = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const r = d[i*4]/255, g = d[i*4+1]/255, b = d[i*4+2]/255;
+    // channel averages in linear light for white balance
+    rs += Math.pow(r, 2.2); gs += Math.pow(g, 2.2); bs += Math.pow(b, 2.2);
+    lumas[i] = 0.2126*r + 0.7152*g + 0.0722*b;
+    const mx = Math.max(r, g, b);
+    satSum += mx > 0 ? (mx - Math.min(r, g, b)) / mx : 0;
+  }
+  rs /= n; gs /= n; bs /= n;
+  lumas.sort();
+  const med = lumas[n >> 1];
+  const p1  = lumas[Math.floor(n * 0.01)];
+  const p99 = lumas[Math.floor(n * 0.99)];
+  const avgSat = satSum / n;
+
+  // gray world: pick temp/tint that equalize the shader's channel gains
+  // shader: r*=1+t*.3, b*=1-t*.3 → solve rs*(1+t*.3) = bs*(1-t*.3)
+  let temp = (bs - rs) / (0.3 * (rs + bs) + 1e-6) * 100;
+  const m = (rs + bs) / 2;
+  let tint = (m - gs) / (0.15 * gs + 0.08 * m + 1e-6) * 100;
+  temp = Math.round(Math.max(-60, Math.min(60, temp)));
+  tint = Math.round(Math.max(-40, Math.min(40, tint)));
+
+  // exposure: bring median luma toward mid-gray (shader applies 2^ev in linear,
+  // which scales gamma-encoded luma by 2^(ev/2.2))
+  let exposure = 2.2 * Math.log2(0.42 / Math.max(0.03, med));
+  exposure = Math.round(Math.max(-1.5, Math.min(1.5, exposure)) * 20) / 20;
+
+  // stretch endpoints toward full range, add contrast if flat, vibrance if dull
+  const whites   = p99 < 0.90 ? Math.min(50, Math.round((0.95 - p99) * 120)) : 0;
+  const blacks   = p1  > 0.05 ? -Math.min(40, Math.round((p1 - 0.03) * 160)) : 0;
+  const spread   = p99 - p1;
+  const contrast = spread < 0.75 ? Math.min(25, Math.round((0.8 - spread) * 60)) : 0;
+  const vibrance = Math.max(0, Math.min(30, Math.round((0.3 - avgSat) * 100)));
+
+  return {exposure, contrast, whites, blacks, temp, tint, vibrance};
+}
+
+function applyAuto() {
+  const adj = computeAuto();
+  if (!adj) return;
+  Object.assign(state, adj);
+  for (const k of Object.keys(adj)) {
+    const el = document.getElementById('s-'+k);
+    const vl = document.getElementById('v-'+k);
+    if (el) el.value = state[k];
+    if (vl) vl.textContent = formatVal(k, state[k]);
+  }
+  uploadLUT(buildCurveLUT(state.curvePoints));
+  scheduleRender();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// View zoom & pan (pinch / wheel / drag), applied as a CSS transform
+// ─────────────────────────────────────────────────────────────────────────────
+const view = {z:1, x:0, y:0};
+
+function inCropMode() {
+  return document.getElementById('crop-panel').style.display !== 'none';
+}
+
+function applyView() {
+  const c = document.getElementById('main-canvas');
+  c.style.transform = (view.z === 1) ? '' : `translate(${view.x}px,${view.y}px) scale(${view.z})`;
+  if (!inCropMode()) c.style.cursor = view.z > 1 ? 'grab' : 'default';
+}
+
+function resetView() { view.z = 1; view.x = 0; view.y = 0; applyView(); }
+
+function clampViewPan() {
+  const c = document.getElementById('main-canvas');
+  const maxX = c.clientWidth  * (view.z - 1) / 2;
+  const maxY = c.clientHeight * (view.z - 1) / 2;
+  view.x = Math.max(-maxX, Math.min(maxX, view.x));
+  view.y = Math.max(-maxY, Math.min(maxY, view.y));
+}
+
+// zoom by `factor` keeping the image point under (clientX, clientY) stationary
+function zoomAt(clientX, clientY, factor) {
+  if (!cropCanvas) return;
+  const ar = document.getElementById('canvas-area').getBoundingClientRect();
+  const ox = clientX - (ar.left + ar.width/2);
+  const oy = clientY - (ar.top  + ar.height/2);
+  const z0 = view.z;
+  const z  = Math.max(1, Math.min(8, z0 * factor));
+  const ux = (ox - view.x) / z0, uy = (oy - view.y) / z0;
+  view.z = z;
+  view.x = ox - ux * z;
+  view.y = oy - uy * z;
+  if (z === 1) { view.x = 0; view.y = 0; }
+  clampViewPan();
+  applyView();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1301,6 +1471,7 @@ function switchPanel(mode) {
   const mainCanvas = document.getElementById('main-canvas');
   const cropOv = document.getElementById('crop-overlay');
   if (mode==='crop') {
+    resetView(); // crop coordinates assume an unzoomed canvas
     mainCanvas.style.cursor='crosshair';
     cropOv.style.display='block';
     drawCropOverlay();
@@ -1383,6 +1554,7 @@ async function loadFile(file) {
   uploadLUT(buildCurveLUT(state.curvePoints));
   uploadTexture(cropCanvas);
   fitCanvas();
+  resetView();
   scheduleRender();
   buildPresetThumbs();
   switchPanel('edit');
@@ -1393,7 +1565,58 @@ async function loadFile(file) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Export
 // ─────────────────────────────────────────────────────────────────────────────
-function exportImage() {
+
+// minimal uncompressed 8-bit RGB little-endian TIFF (browsers can't encode TIFF)
+function encodeTIFF(rgba, w, h) {
+  const rgb = new Uint8Array(w * h * 3);
+  for (let i = 0, j = 0; i < w * h; i++) {
+    rgb[j++] = rgba[i*4]; rgb[j++] = rgba[i*4+1]; rgb[j++] = rgba[i*4+2];
+  }
+  const numEntries = 12;
+  const ifdOff  = 8;
+  const bpsOff  = ifdOff + 2 + numEntries*12 + 4; // BitsPerSample SHORT[3]
+  const resOff  = bpsOff + 6;                      // two RATIONALs
+  const dataOff = resOff + 16;
+  const buf = new ArrayBuffer(dataOff + rgb.length);
+  const dv  = new DataView(buf);
+  dv.setUint16(0, 0x4949, true);       // 'II' little-endian
+  dv.setUint16(2, 42, true);
+  dv.setUint32(4, ifdOff, true);
+  let o = ifdOff;
+  dv.setUint16(o, numEntries, true); o += 2;
+  const entry = (tag, type, count, val) => {
+    dv.setUint16(o, tag, true); dv.setUint16(o+2, type, true);
+    dv.setUint32(o+4, count, true); dv.setUint32(o+8, val, true); o += 12;
+  };
+  entry(0x0100, 4, 1, w);           // ImageWidth
+  entry(0x0101, 4, 1, h);           // ImageLength
+  entry(0x0102, 3, 3, bpsOff);      // BitsPerSample 8,8,8
+  entry(0x0103, 3, 1, 1);           // Compression: none
+  entry(0x0106, 3, 1, 2);           // Photometric: RGB
+  entry(0x0111, 4, 1, dataOff);     // StripOffsets
+  entry(0x0115, 3, 1, 3);           // SamplesPerPixel
+  entry(0x0116, 4, 1, h);           // RowsPerStrip
+  entry(0x0117, 4, 1, rgb.length);  // StripByteCounts
+  entry(0x011A, 5, 1, resOff);      // XResolution
+  entry(0x011B, 5, 1, resOff + 8);  // YResolution
+  entry(0x0128, 3, 1, 2);           // ResolutionUnit: inch
+  dv.setUint32(o, 0, true);         // no next IFD
+  dv.setUint16(bpsOff, 8, true); dv.setUint16(bpsOff+2, 8, true); dv.setUint16(bpsOff+4, 8, true);
+  dv.setUint32(resOff,   72, true); dv.setUint32(resOff+4,  1, true);
+  dv.setUint32(resOff+8, 72, true); dv.setUint32(resOff+12, 1, true);
+  new Uint8Array(buf).set(rgb, dataOff);
+  return buf;
+}
+
+function downloadBlob(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
+function exportImage(format = 'jpeg') {
   if (!cropCanvas || !gl) return;
   const MAX = 4096;
   const iw = cropCanvas.width, ih = cropCanvas.height;
@@ -1444,16 +1667,14 @@ function exportImage() {
     flipped.set(pixels.subarray(src,src+ew*4),dst);
   }
 
+  if (format === 'tiff') {
+    downloadBlob(new Blob([encodeTIFF(flipped, ew, eh)], {type:'image/tiff'}), 'safelight-edit.tif');
+    return;
+  }
   const outCanvas = document.createElement('canvas');
   outCanvas.width=ew; outCanvas.height=eh;
   outCanvas.getContext('2d').putImageData(new ImageData(flipped,ew,eh),0,0);
-  outCanvas.toBlob(blob => {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'safelight-edit.jpg';
-    a.click();
-    setTimeout(()=>URL.revokeObjectURL(a.href),10000);
-  }, 'image/jpeg', 0.92);
+  outCanvas.toBlob(blob => downloadBlob(blob, 'safelight-edit.jpg'), 'image/jpeg', 0.92);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1608,8 +1829,115 @@ function init() {
     activePreset=0;
   });
 
-  // Export
-  document.getElementById('export-btn').addEventListener('click', exportImage);
+  // Auto adjust
+  document.getElementById('auto-btn').addEventListener('click', applyAuto);
+
+  // Export format menu
+  const exportMenu = document.getElementById('export-menu');
+  document.getElementById('export-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    if (exportMenu.classList.contains('open')) { exportMenu.classList.remove('open'); return; }
+    exportMenu.classList.add('open');
+    const r = e.currentTarget.getBoundingClientRect();
+    const mw = exportMenu.offsetWidth, mh = exportMenu.offsetHeight;
+    exportMenu.style.left = Math.min(window.innerWidth - mw - 8, Math.max(8, r.right - mw)) + 'px';
+    exportMenu.style.top  = (r.bottom + 6 + mh > window.innerHeight ? r.top - 6 - mh : r.bottom + 6) + 'px';
+  });
+  document.addEventListener('click', () => exportMenu.classList.remove('open'));
+  document.querySelectorAll('.export-opt').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    exportMenu.classList.remove('open');
+    exportImage(b.dataset.fmt);
+  }));
+
+  // ── Zoom & pan ──
+  const area = document.getElementById('canvas-area');
+  area.addEventListener('wheel', e => {
+    if (!cropCanvas) return;
+    e.preventDefault();
+    zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0022));
+  }, {passive:false});
+
+  let panning = null;
+  mainCanvas.addEventListener('mousedown', e => {
+    if (e.button === 0 && view.z > 1 && !inCropMode()) {
+      e.preventDefault();
+      panning = {x:e.clientX, y:e.clientY};
+      mainCanvas.style.cursor = 'grabbing';
+    }
+  });
+  window.addEventListener('mousemove', e => {
+    if (!panning) return;
+    view.x += e.clientX - panning.x;
+    view.y += e.clientY - panning.y;
+    panning = {x:e.clientX, y:e.clientY};
+    clampViewPan();
+    applyView();
+  });
+  window.addEventListener('mouseup', () => {
+    if (panning) { panning = null; applyView(); }
+  });
+  mainCanvas.addEventListener('dblclick', e => {
+    if (!inCropMode()) zoomAt(e.clientX, e.clientY, view.z > 1 ? 1/view.z : 2.5);
+  });
+
+  let pinch = null, touchPan = null, lastTapT = 0, lastTapX = 0, lastTapY = 0;
+  area.addEventListener('touchstart', e => {
+    if (!cropCanvas) return;
+    if (e.touches.length === 2 && !inCropMode()) {
+      e.preventDefault();
+      const [a, b] = e.touches;
+      pinch = {d:Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY),
+               cx:(a.clientX+b.clientX)/2, cy:(a.clientY+b.clientY)/2,
+               z:view.z, x:view.x, y:view.y};
+      touchPan = null;
+      return;
+    }
+    if (e.touches.length === 1 && !inCropMode()) {
+      const t = Date.now(), tx = e.touches[0].clientX, ty = e.touches[0].clientY;
+      if (t - lastTapT < 300 && Math.hypot(tx-lastTapX, ty-lastTapY) < 30) {
+        e.preventDefault();
+        zoomAt(tx, ty, view.z > 1 ? 1/view.z : 2.5);
+        lastTapT = 0;
+        return;
+      }
+      lastTapT = t; lastTapX = tx; lastTapY = ty;
+      if (view.z > 1) {
+        e.preventDefault();
+        touchPan = {x:tx, y:ty};
+      }
+    }
+  }, {passive:false});
+  area.addEventListener('touchmove', e => {
+    if (pinch && e.touches.length === 2) {
+      e.preventDefault();
+      const [a, b] = e.touches;
+      const ar = area.getBoundingClientRect();
+      const cx = (a.clientX+b.clientX)/2, cy = (a.clientY+b.clientY)/2;
+      const ox  = cx - (ar.left + ar.width/2),       oy  = cy - (ar.top + ar.height/2);
+      const ox0 = pinch.cx - (ar.left + ar.width/2), oy0 = pinch.cy - (ar.top + ar.height/2);
+      const z = Math.max(1, Math.min(8, pinch.z * Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY) / pinch.d));
+      const ux = (ox0 - pinch.x) / pinch.z, uy = (oy0 - pinch.y) / pinch.z;
+      view.z = z;
+      view.x = ox - ux * z;
+      view.y = oy - uy * z;
+      if (z === 1) { view.x = 0; view.y = 0; }
+      clampViewPan();
+      applyView();
+    } else if (touchPan && e.touches.length === 1) {
+      e.preventDefault();
+      const t = e.touches[0];
+      view.x += t.clientX - touchPan.x;
+      view.y += t.clientY - touchPan.y;
+      touchPan = {x:t.clientX, y:t.clientY};
+      clampViewPan();
+      applyView();
+    }
+  }, {passive:false});
+  area.addEventListener('touchend', e => {
+    if (e.touches.length < 2) pinch = null;
+    if (e.touches.length === 0) touchPan = null;
+  });
 
   // Compare — hold button or hold on canvas
   let compareSaved = null;
