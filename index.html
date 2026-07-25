@@ -79,12 +79,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
 /* ── Toolbar ── */
 #toolbar{display:flex;align-items:center;gap:3px;padding:8px 6px;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none}
 #toolbar::-webkit-scrollbar{display:none}
-.tool-btn{display:flex;align-items:center;gap:4px;background:none;border:1px solid var(--border);color:var(--text);padding:7px 9px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;transition:background .15s}
+.tool-btn{display:flex;align-items:center;gap:4px;background:none;border:1px solid var(--border);color:var(--text);padding:7px 8px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;transition:background .15s}
 .tool-btn:hover{background:var(--cyan-soft)}
 .tool-btn.active{border-color:var(--accent-deep);color:var(--accent-deep);background:var(--accent-soft)}
 .tool-btn svg{width:15px;height:15px;flex-shrink:0}
-.icon-btn{padding:7px 8px}
-#toolbar-right{margin-left:auto;display:flex;gap:4px}
+/* icon buttons carry the slack: eight controls have to fit a 340px sidebar */
+.icon-btn{padding:7px 5px}
+#toolbar-right{margin-left:auto;display:flex;gap:3px}
 #export-btn{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:600}
 #export-btn:hover{background:#2ae9bc;border-color:#2ae9bc}
 
@@ -180,6 +181,46 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
 #crop-apply:hover{background:#2ae9bc;border-color:#2ae9bc}
 #crop-reset{background:none;border:1px solid var(--border);color:var(--text-dim)}
 
+/* ── Saved edits (library) ── */
+#library-panel{padding:12px;display:flex;flex-direction:column;gap:12px}
+.lib-section{display:flex;flex-direction:column;gap:6px}
+.lib-head{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim)}
+.lib-note{font-size:11px;color:var(--text-dim);line-height:1.45}
+.lib-btns{display:flex;gap:6px;flex-wrap:wrap}
+.lib-btn{flex:1 1 90px;padding:7px;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:5px;font-size:11px;cursor:pointer;white-space:nowrap}
+.lib-btn:hover{background:var(--cyan-soft)}
+.lib-btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+.lib-btn.primary:hover{background:#2ae9bc;border-color:#2ae9bc}
+.lib-btn:disabled{opacity:.45;cursor:default;pointer-events:none}
+.lib-check{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);cursor:pointer}
+.lib-check input{accent-color:var(--accent-deep);width:14px;height:14px}
+#lib-list{display:flex;flex-direction:column;gap:4px}
+.lib-row{display:flex;align-items:center;gap:8px;padding:6px;border:1px solid var(--border);border-radius:5px;background:var(--plate)}
+.lib-row img{width:38px;height:38px;object-fit:cover;border-radius:3px;background:var(--panel-2);flex-shrink:0}
+.lib-row .lib-meta{flex:1;min-width:0}
+.lib-row .lib-name{font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lib-row .lib-sub{font-size:10px;color:var(--text-dim)}
+.lib-row button{background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:4px;font-size:10px;padding:4px 7px;cursor:pointer}
+.lib-row button:hover{border-color:var(--accent-deep);color:var(--accent-deep)}
+.lib-row button.lib-del:hover{border-color:var(--danger);color:var(--danger)}
+.lib-empty{font-size:11px;color:var(--text-dim);padding:6px 0}
+#lib-status{font-size:11px;color:var(--accent-deep)}
+
+/* ── Toast ── */
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:60;display:none;align-items:center;gap:10px;max-width:min(92vw,420px);
+  background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--shadow);padding:9px 12px;font-size:12px;color:var(--text)}
+#toast.open{display:flex}
+#toast button{background:var(--accent);border:none;color:var(--on-accent);font:600 11px system-ui,sans-serif;padding:5px 10px;border-radius:4px;cursor:pointer;flex-shrink:0}
+
+/* ── Google Drive setup dialog ── */
+#drive-setup{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;background:rgba(58,80,90,.35);padding:16px}
+#drive-setup.open{display:flex}
+#drive-setup .dlg{background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--shadow);padding:14px;width:min(100%,420px);max-height:86vh;overflow-y:auto}
+#drive-setup h3{font-size:13px;color:var(--text);margin-bottom:8px}
+#drive-setup ol{margin:0 0 10px 16px;font-size:11px;color:var(--text-dim);line-height:1.6}
+#drive-setup code{background:var(--panel-2);border-radius:3px;padding:0 3px;font-size:10px;word-break:break-all}
+#drive-setup input{width:100%;padding:7px;border:1px solid var(--border);border-radius:5px;background:var(--plate);color:var(--text);font-size:11px;margin-bottom:10px}
+
 /* ── Scrollbar ── */
 #panel-scroll::-webkit-scrollbar{width:4px}
 #panel-scroll::-webkit-scrollbar-track{background:transparent}
@@ -210,6 +251,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
       <button class="tool-btn active" id="btn-edit">Edit</button>
       <button class="tool-btn" id="btn-crop">Crop</button>
       <button class="tool-btn" id="btn-presets">Presets</button>
+      <button class="tool-btn icon-btn" id="btn-library" title="Saved edits" aria-label="Saved edits">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+      </button>
       <div id="toolbar-right">
         <button class="tool-btn icon-btn" id="compare-btn" title="Hold to see original" aria-label="Hold to see original">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -314,6 +358,62 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
       <div id="presets-panel" style="display:none;padding:12px">
         <div id="presets-grid"></div>
       </div>
+
+      <!-- Saved edits panel -->
+      <div id="library-panel" style="display:none">
+        <div class="lib-section">
+          <div class="lib-head">This photo</div>
+          <div id="lib-status">No photo open</div>
+          <div class="lib-btns">
+            <button class="lib-btn primary" id="lib-save-device">Save on device</button>
+            <button class="lib-btn" id="lib-save-file">Save as file</button>
+          </div>
+          <label class="lib-check" title="Embeds the decoded preview so the edit file opens without the original RAW">
+            <input type="checkbox" id="lib-embed" checked> Include photo in saved file
+          </label>
+        </div>
+
+        <div class="lib-section">
+          <div class="lib-head">Google Drive</div>
+          <div class="lib-btns">
+            <button class="lib-btn" id="lib-drive-connect">Connect Drive</button>
+            <button class="lib-btn" id="lib-drive-save" disabled>Save to Drive</button>
+            <button class="lib-btn" id="lib-drive-open" disabled>Open from Drive</button>
+          </div>
+          <div class="lib-note" id="lib-drive-note">Not connected. Needs a one-time Google client ID — <a href="#" id="lib-drive-setup">set up</a>.</div>
+          <div id="lib-drive-list"></div>
+        </div>
+
+        <div class="lib-section">
+          <div class="lib-head">On this device</div>
+          <div class="lib-btns">
+            <button class="lib-btn" id="lib-open-file">Open edit file…</button>
+          </div>
+          <div id="lib-list"><div class="lib-empty">Nothing saved yet</div></div>
+          <div class="lib-note">Edits auto-save here as you work, and stay in this browser until you clear its data.</div>
+        </div>
+        <input type="file" id="edit-file-input" accept=".json,.safelight,application/json" style="display:none">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"><span id="toast-msg"></span><button id="toast-action" style="display:none"></button></div>
+
+<div id="drive-setup">
+  <div class="dlg">
+    <h3>Connect Google Drive</h3>
+    <ol>
+      <li>Open the <b>Google Cloud console</b> → APIs &amp; Services → Credentials.</li>
+      <li>Enable the <b>Google Drive API</b> for the project.</li>
+      <li>Create an <b>OAuth client ID</b> of type <b>Web application</b>.</li>
+      <li>Add this page's origin under <b>Authorised JavaScript origins</b>:<br><code id="drive-origin"></code></li>
+      <li>Paste the client ID below. It is kept in this browser only.</li>
+    </ol>
+    <input type="text" id="drive-client-id" placeholder="123456789-abc.apps.googleusercontent.com" spellcheck="false">
+    <div class="lib-btns">
+      <button class="lib-btn" id="drive-setup-cancel">Cancel</button>
+      <button class="lib-btn primary" id="drive-setup-save">Save &amp; connect</button>
     </div>
   </div>
 </div>
@@ -474,6 +574,8 @@ function extractJPEGs(buf) {
   return [...parseTIFFPreviews(buf), ...parseRAFPreview(buf), ...scanJPEGs(buf)];
 }
 
+// resolves {img, blob} — the blob is kept so the decoded preview can be saved
+// with an edit, letting the project reopen without the original RAW
 function loadBestJPEG(candidates) {
   return new Promise((resolve, reject) => {
     if (!candidates.length) { reject(new Error('No embedded JPEG found')); return; }
@@ -485,7 +587,7 @@ function loadBestJPEG(candidates) {
       const blob = new Blob([sorted[idx++]], {type:'image/jpeg'});
       const url  = URL.createObjectURL(blob);
       const img  = new Image();
-      img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+      img.onload = () => { URL.revokeObjectURL(url); resolve({img, blob}); };
       img.onerror = () => { URL.revokeObjectURL(url); tryNext(); };
       img.src = url;
     }
@@ -877,8 +979,8 @@ function flipBase(horizontal) {
   baseCanvas = c;
 }
 
-// sourceImg → baseCanvas with current rotation/flip (used on load and crop reset)
-function rebuildBase() {
+// sourceImg downscaled to fit the GPU, with no geometry applied yet
+function baseFromSource() {
   if (!sourceImg) return;
   const img = sourceImg;
   const maxTex = maxTexSize();
@@ -888,10 +990,71 @@ function rebuildBase() {
   c.height = Math.max(1, Math.round(img.naturalHeight * scale));
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   baseCanvas = c;
+}
+
+// sourceImg → baseCanvas with current rotation/flip (used on load and crop reset)
+function rebuildBase() {
+  if (!sourceImg) return;
+  baseFromSource();
   const rot = ((state.rotation % 4) + 4) % 4;
   for (let i = 0; i < rot; i++) rotateBase90();
   if (state.flipH) flipBase(true);
   if (state.flipV) flipBase(false);
+  geomOps = canonicalGeomOps();
+}
+
+// ── Geometry as a replayable log ────────────────────────────────────────────
+// Crops bake pixels into baseCanvas, so the canvas alone can't be described by
+// the slider state. Every geometry step is also recorded here as data, which is
+// what makes an edit reproducible from the original file in a later session.
+//   {op:'rot90'} | {op:'flip',axis:'h'|'v'} | {op:'crop',straighten,rect}
+// crop rects are normalised against the straightened canvas they were cut from,
+// so replay is independent of the device's max texture size.
+let geomOps = [];
+
+// the op list equivalent to rebuildBase() at the current rotation/flip
+function canonicalGeomOps() {
+  const ops = [];
+  const rot = ((state.rotation % 4) + 4) % 4;
+  for (let i = 0; i < rot; i++) ops.push({op:'rot90'});
+  if (state.flipH) ops.push({op:'flip', axis:'h'});
+  if (state.flipV) ops.push({op:'flip', axis:'v'});
+  return ops;
+}
+
+function cloneGeomOps(ops) {
+  return (ops || []).map(o => o.op === 'crop'
+    ? {op:'crop', straighten:o.straighten, rect:{...o.rect}}
+    : {...o});
+}
+
+// cut a recorded crop out of the current baseCanvas — the replay half of applyCrop
+function bakeCropOp(op) {
+  state.straighten = op.straighten;
+  buildCropCanvas();
+  const cc = cropCanvas;
+  if (!cc) return;
+  const cw = op.rect.w * cc.width, ch = op.rect.h * cc.height;
+  const baked = document.createElement('canvas');
+  baked.width  = Math.max(1, Math.round(cw));
+  baked.height = Math.max(1, Math.round(ch));
+  baked.getContext('2d').drawImage(cc, op.rect.x * cc.width, op.rect.y * cc.height, cw, ch,
+                                      0, 0, baked.width, baked.height);
+  baseCanvas = baked;
+  state.straighten = 0; // applyCrop consumes the angle it baked in
+}
+
+// rebuild baseCanvas from the original image by replaying the op log
+function applyGeomOps() {
+  if (!sourceImg) return;
+  baseFromSource();
+  let rot = 0, fh = false, fv = false;
+  for (const op of geomOps) {
+    if (op.op === 'rot90')     { rotateBase90(); rot = (rot + 1) % 4; }
+    else if (op.op === 'flip') { flipBase(op.axis === 'h'); if (op.axis === 'h') fh = !fh; else fv = !fv; }
+    else if (op.op === 'crop') { bakeCropOp(op); }
+  }
+  state.rotation = rot; state.flipH = fh; state.flipV = fv;
 }
 
 function buildCropCanvas() {
@@ -1384,6 +1547,11 @@ function applyCrop() {
   if (cw < 10 || ch < 10) return;
 
   pushHistory('Crop');
+  // record before baking — cropCanvas is still the straightened canvas this rect was drawn on
+  geomOps.push({op:'crop', straighten: state.straighten, rect:{
+    x: cx0 / cropCanvas.width,  y: cy0 / cropCanvas.height,
+    w: cw  / cropCanvas.width,  h: ch  / cropCanvas.height,
+  }});
   // bake the selected region of the displayed (straightened) image into baseCanvas
   const baked = document.createElement('canvas');
   baked.width  = Math.round(cw);
@@ -1746,6 +1914,7 @@ function snapshot() {
     splitHigh:   state.splitHigh.slice(),
     straighten:  state.straighten,
     rotation: state.rotation, flipH: state.flipH, flipV: state.flipV,
+    geomOps: cloneGeomOps(geomOps),
     baseCanvas,
   };
   for (const k of PARAMS) snap.params[k] = state[k];
@@ -1756,17 +1925,21 @@ function pushHistory(label, snap) {
   history.push({label, snap: snap || snapshot()});
   if (history.length > HISTORY_MAX) history.shift();
   renderHistoryList();
+  scheduleAutosave();
 }
 
 function restoreSnap(snap) {
-  const geomChanged = baseCanvas !== snap.baseCanvas || state.straighten !== snap.straighten;
+  // snapshots restored from a saved project have no live canvas — replay instead
+  const geomChanged = !snap.baseCanvas || baseCanvas !== snap.baseCanvas || state.straighten !== snap.straighten;
   for (const k of PARAMS) state[k] = snap.params[k];
   state.curvePoints = JSON.parse(JSON.stringify(snap.curvePoints));
   state.splitShadow = snap.splitShadow.slice();
   state.splitHigh   = snap.splitHigh.slice();
   state.straighten  = snap.straighten;
   state.rotation = snap.rotation; state.flipH = snap.flipH; state.flipV = snap.flipV;
-  baseCanvas = snap.baseCanvas;
+  geomOps = cloneGeomOps(snap.geomOps);
+  if (snap.baseCanvas) baseCanvas = snap.baseCanvas;
+  else { applyGeomOps(); state.straighten = snap.straighten; }
   for (const k of PARAMS) {
     const el = document.getElementById('s-'+k);
     const vl = document.getElementById('v-'+k);
@@ -1791,6 +1964,7 @@ function revertTo(i) {
   history.length = i;
   restoreSnap(snap);
   renderHistoryList();
+  scheduleAutosave();
 }
 
 function undo() { if (gl && cropCanvas) revertTo(history.length - 1); }
@@ -1871,6 +2045,7 @@ function switchPanel(mode) {
   document.getElementById('edit-panel').style.display    = mode==='edit'    ? '' : 'none';
   document.getElementById('crop-panel').style.display    = mode==='crop'    ? '' : 'none';
   document.getElementById('presets-panel').style.display = mode==='presets' ? '' : 'none';
+  document.getElementById('library-panel').style.display = mode==='library' ? '' : 'none';
   document.querySelectorAll('#toolbar .tool-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('btn-'+mode)?.classList.add('active');
 
@@ -1907,11 +2082,11 @@ async function loadFile(file) {
   overlay.classList.remove('hidden');
   msg.style.color = '';
   msg.textContent = 'Loading…';
-  let img;
+  let img, blob;
   try {
     const buf = await file.arrayBuffer();
     const candidates = extractJPEGs(buf);
-    img = await loadBestJPEG(candidates.length ? candidates : [buf]);
+    ({img, blob} = await loadBestJPEG(candidates.length ? candidates : [buf]));
   } catch(err) {
     // fallback: treat as JPEG/PNG directly
     try {
@@ -1922,15 +2097,40 @@ async function loadFile(file) {
         im.onerror = () => { URL.revokeObjectURL(url); rej(err); };
         im.src = url;
       });
+      blob = file;
     } catch(e2) {
       msg.style.color = 'var(--danger)';
       msg.textContent = `Failed to load: ${err.message}`;
       return;
     }
   }
-  sourceImg = img;
   msg.textContent = 'Drop a RAW file here';
   overlay.classList.add('hidden');
+
+  beginSession(img, blob, {
+    name: file.name, size: file.size, lastModified: file.lastModified,
+  });
+
+  // an edit file opened before its photo was available applies now
+  if (pendingDoc) {
+    const doc = pendingDoc;
+    pendingDoc = null;
+    applyEditDoc(doc);
+    toast(`Continuing edits from ${doc.source?.name || 'saved file'}`);
+    return;
+  }
+  await offerSavedEdits();
+}
+
+// shared setup for a freshly decoded photo, whether it came from a picked file
+// or from the preview stored inside a saved project
+function beginSession(img, blob, meta) {
+  sourceImg = img;
+  sourceBlob = blob || null;
+  sourceMeta = meta || {name:'photo'};
+  currentProject = {id: projectId(sourceMeta), driveFileId: null};
+  lastSavedAt = 0;
+  clearTimeout(autosaveTimer);
 
   // reset state
   Object.assign(state, {rotation:0,flipH:false,flipV:false,straighten:0});
@@ -1955,6 +2155,7 @@ async function loadFile(file) {
     initGL(document.getElementById('main-canvas'));
     if (!gl) return;
   }
+  geomOps = [];
   rebuildBase();
   buildCropCanvas();
 
@@ -1966,8 +2167,480 @@ async function loadFile(file) {
   buildPresetThumbs();
   switchPanel('edit');
   clearHistory();
+  refreshLibraryStatus();
 
-  document.title = `Safelight — ${file.name}`;
+  document.title = `Safelight — ${sourceMeta.name}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Saved edits
+//
+// An edit is kept apart from the photo as a small document: slider values, the
+// tone curve, and the geometry op log. Replaying that log against the original
+// image reproduces the edit exactly, so a session can be put down and picked up
+// later. Three places to keep it — the device (automatic), a downloaded file,
+// and Google Drive — all share the one document format below.
+// ─────────────────────────────────────────────────────────────────────────────
+const DOC_FORMAT = 'safelight-edit';
+const DOC_VERSION = 1;
+
+let sourceBlob = null;     // decoded preview JPEG, kept for saving
+let sourceMeta = null;     // {name,size,lastModified}
+let currentProject = null; // {id, driveFileId}
+let pendingDoc = null;     // edit opened before its photo was available
+
+// stable per-photo key, so reopening the same file resumes its edit
+function projectId(meta) {
+  return [meta.name || 'photo', meta.size || 0, meta.lastModified || 0].join('|');
+}
+
+function serializeEdit() {
+  const e = {params:{}, curvePoints: state.curvePoints.map(p => ({x:p.x, y:p.y})),
+    splitShadow: state.splitShadow.slice(), splitHigh: state.splitHigh.slice(),
+    straighten: state.straighten, rotation: state.rotation,
+    flipH: state.flipH, flipV: state.flipV, geomOps: cloneGeomOps(geomOps)};
+  for (const k of PARAMS) e.params[k] = state[k];
+  return e;
+}
+
+// an edit doc in the shape restoreSnap() expects (no live canvas — replayed)
+function editToSnap(e) {
+  return {params:{...e.params}, curvePoints:(e.curvePoints||[{x:0,y:0},{x:1,y:1}]).map(p=>({x:p.x,y:p.y})),
+    splitShadow:(e.splitShadow||[0,0,0]).slice(), splitHigh:(e.splitHigh||[0,0,0]).slice(),
+    straighten:e.straighten||0, rotation:e.rotation||0, flipH:!!e.flipH, flipV:!!e.flipV,
+    geomOps: cloneGeomOps(e.geomOps), baseCanvas: null};
+}
+
+function buildDoc() {
+  return {
+    format: DOC_FORMAT, version: DOC_VERSION, savedAt: new Date().toISOString(),
+    source: {name: sourceMeta?.name || 'photo', size: sourceMeta?.size || 0,
+             lastModified: sourceMeta?.lastModified || 0},
+    edit: serializeEdit(),
+    history: history.map(h => ({label: h.label, edit: {
+      params: {...h.snap.params}, curvePoints: h.snap.curvePoints.map(p=>({x:p.x,y:p.y})),
+      splitShadow: h.snap.splitShadow.slice(), splitHigh: h.snap.splitHigh.slice(),
+      straighten: h.snap.straighten, rotation: h.snap.rotation,
+      flipH: h.snap.flipH, flipV: h.snap.flipV, geomOps: cloneGeomOps(h.snap.geomOps),
+    }})),
+  };
+}
+
+// put a saved edit back on screen; assumes sourceImg is already the right photo
+function applyEditDoc(doc) {
+  if (!doc || !doc.edit || !sourceImg) return;
+  history.length = 0;
+  for (const h of (doc.history || [])) history.push({label: h.label, snap: editToSnap(h.edit)});
+  renderHistoryList();
+  restoreSnap(editToSnap(doc.edit));
+  activePreset = -1;
+  document.querySelectorAll('.preset-item').forEach(d => d.classList.remove('active'));
+  scheduleAutosave();   // an edit opened from a file or Drive gets a device copy too
+  refreshLibraryStatus();
+}
+
+// ── Device storage (IndexedDB) ──────────────────────────────────────────────
+const DB_NAME = 'safelight', DB_STORE = 'projects', DB_VERSION = 1;
+const PROJECTS_KEPT = 30;
+let dbPromise = null;
+
+function idb() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE, {keyPath:'id'});
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  }).catch(err => { dbPromise = null; throw err; });
+  return dbPromise;
+}
+
+function idbRun(mode, fn) {
+  return idb().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, mode);
+    const req = fn(tx.objectStore(DB_STORE));
+    tx.onerror = () => reject(tx.error);
+    if (req) { req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); }
+    else tx.oncomplete = () => resolve();
+  }));
+}
+
+const idbGet = id  => idbRun('readonly',  s => s.get(id));
+const idbAll = ()  => idbRun('readonly',  s => s.getAll());
+const idbDel = id  => idbRun('readwrite', s => s.delete(id));
+const idbPut = rec => idbRun('readwrite', s => s.put(rec));
+
+// small JPEG of the current render, for the saved-edits list
+function makeThumb() {
+  if (!cropCanvas) return null;
+  const max = 96;
+  const s = Math.min(max / cropCanvas.width, max / cropCanvas.height, 1);
+  const c = document.createElement('canvas');
+  c.width  = Math.max(1, Math.round(cropCanvas.width  * s));
+  c.height = Math.max(1, Math.round(cropCanvas.height * s));
+  c.getContext('2d').drawImage(cropCanvas, 0, 0, c.width, c.height);
+  try { return c.toDataURL('image/jpeg', 0.7); } catch(e) { return null; }
+}
+
+async function saveToDevice(quiet) {
+  if (!sourceImg || !currentProject) return false;
+  try {
+    const prev = await idbGet(currentProject.id).catch(() => null);
+    await idbPut({
+      id: currentProject.id,
+      name: sourceMeta?.name || 'photo',
+      savedAt: Date.now(),
+      edits: history.length,
+      doc: buildDoc(),
+      preview: sourceBlob || null,
+      thumb: makeThumb(),
+      driveFileId: currentProject.driveFileId || prev?.driveFileId || null,
+    });
+    await pruneProjects();
+    lastSavedAt = Date.now();
+    refreshLibraryStatus();
+    renderLibraryList();
+    if (!quiet) toast('Saved on this device');
+    return true;
+  } catch(err) {
+    // a multi-megabyte preview per project can hit the storage quota
+    toast(err && /quota/i.test(err.name || '') ? 'Device storage is full — save as a file instead'
+                                               : 'Could not save on this device');
+    return false;
+  }
+}
+
+async function pruneProjects() {
+  const all = await idbAll();
+  if (all.length <= PROJECTS_KEPT) return;
+  all.sort((a,b) => b.savedAt - a.savedAt);
+  for (const rec of all.slice(PROJECTS_KEPT)) await idbDel(rec.id);
+}
+
+let autosaveTimer = null, lastSavedAt = 0;
+function scheduleAutosave() {
+  if (!sourceImg) return;
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(() => saveToDevice(true), 800);
+}
+
+// open a stored project: decode its preview, then replay the edit onto it
+async function openProject(id) {
+  const rec = await idbGet(id).catch(() => null);
+  if (!rec) { toast('That saved edit is gone'); return; }
+  if (rec.preview) {
+    const img = await blobToImage(rec.preview).catch(() => null);
+    if (!img) { toast('Saved photo could not be decoded'); return; }
+    beginSession(img, rec.preview, rec.doc.source);
+    currentProject.driveFileId = rec.driveFileId || null;
+    applyEditDoc(rec.doc);
+    toast(`Continuing ${rec.name}`);
+  } else {
+    pendingDoc = rec.doc;
+    toast(`Open ${rec.doc.source.name} to continue`, 'Open', () => document.getElementById('file-input').click());
+  }
+}
+
+function blobToImage(blob) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const im = new Image();
+    im.onload  = () => { URL.revokeObjectURL(url); resolve(im); };
+    im.onerror = () => { URL.revokeObjectURL(url); reject(new Error('decode failed')); };
+    im.src = url;
+  });
+}
+
+// on load, mention an existing edit rather than silently overwriting it
+async function offerSavedEdits() {
+  if (!currentProject) return;
+  const rec = await idbGet(currentProject.id).catch(() => null);
+  if (!rec || !rec.doc || !(rec.doc.history || []).length) return;
+  currentProject.driveFileId = rec.driveFileId || null;
+  toast(`${rec.doc.history.length} saved edits for this photo`, 'Restore', () => {
+    applyEditDoc(rec.doc);
+    toast('Edits restored');
+  }, 9000);
+}
+
+// ── Edit files ──────────────────────────────────────────────────────────────
+function docFileName() {
+  const base = (sourceMeta?.name || 'photo').replace(/\.[^.]+$/, '');
+  return `${base}.safelight.json`;
+}
+
+// `embed` writes the decoded preview into the file, so it opens anywhere;
+// without it the file stays a few KB but needs the original photo alongside
+async function docWithImage(embed) {
+  const doc = buildDoc();
+  if (embed && sourceBlob) doc.image = await blobToDataURL(sourceBlob);
+  return doc;
+}
+
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.onerror = () => reject(fr.error);
+    fr.readAsDataURL(blob);
+  });
+}
+
+function dataURLToBlob(url) {
+  const [head, b64] = url.split(',');
+  const mime = (head.match(/:(.*?);/) || [,'image/jpeg'])[1];
+  const bin = atob(b64);
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return new Blob([u8], {type: mime});
+}
+
+async function saveEditFile() {
+  if (!sourceImg) { toast('Open a photo first'); return; }
+  const embed = document.getElementById('lib-embed').checked;
+  const doc = await docWithImage(embed);
+  downloadBlob(new Blob([JSON.stringify(doc)], {type:'application/json'}), docFileName());
+}
+
+async function openEditFile(file) {
+  let doc;
+  try { doc = JSON.parse(await file.text()); }
+  catch(e) { toast('That file is not a saved edit'); return; }
+  await openEditDoc(doc);
+}
+
+async function openEditDoc(doc) {
+  if (!doc || doc.format !== DOC_FORMAT) { toast('That file is not a saved edit'); return; }
+  if (doc.image) {
+    const blob = dataURLToBlob(doc.image);
+    const img = await blobToImage(blob).catch(() => null);
+    if (!img) { toast('The photo inside that file could not be decoded'); return; }
+    beginSession(img, blob, doc.source);
+    applyEditDoc(doc);
+    toast(`Continuing ${doc.source?.name || 'saved edit'}`);
+  } else if (sourceImg && projectId(sourceMeta) === projectId(doc.source || {})) {
+    applyEditDoc(doc);          // same photo already open
+    toast('Edits restored');
+  } else {
+    pendingDoc = doc;           // saved without the photo — wait for the original
+    toast(`Open ${doc.source?.name || 'the original photo'} to continue`, 'Open',
+          () => document.getElementById('file-input').click(), 12000);
+  }
+}
+
+// ── Google Drive ────────────────────────────────────────────────────────────
+// Per-file scope only: the app can read and write the edit files it creates,
+// nothing else in the user's Drive. The client ID belongs to whoever deploys
+// this page, so it is entered once and kept in localStorage.
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const DRIVE_KEY = 'safelight.drive.clientId';
+let driveToken = null, driveTokenClient = null, gisPromise = null;
+
+const driveClientId = () => localStorage.getItem(DRIVE_KEY) || '';
+
+function loadGIS() {
+  if (gisPromise) return gisPromise;
+  gisPromise = new Promise((resolve, reject) => {
+    if (window.google?.accounts?.oauth2) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => { gisPromise = null; reject(new Error('Google sign-in failed to load')); };
+    document.head.appendChild(s);
+  });
+  return gisPromise;
+}
+
+async function driveConnect() {
+  const id = driveClientId();
+  if (!id) { openDriveSetup(); return false; }
+  try { await loadGIS(); }
+  catch(e) { toast('Could not reach Google — check the connection'); return false; }
+  return new Promise(resolve => {
+    driveTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: id, scope: DRIVE_SCOPE,
+      callback: resp => {
+        if (resp.error || !resp.access_token) { toast('Google Drive was not connected'); resolve(false); return; }
+        driveToken = resp.access_token;
+        refreshDriveUI();
+        resolve(true);
+      },
+    });
+    driveTokenClient.requestAccessToken({prompt: driveToken ? '' : 'consent'});
+  });
+}
+
+async function driveFetch(url, opts = {}, retry = true) {
+  if (!driveToken && !(await driveConnect())) throw new Error('not connected');
+  const res = await fetch(url, {...opts, headers:{...(opts.headers||{}), Authorization:'Bearer '+driveToken}});
+  if (res.status === 401 && retry) {   // access tokens expire after about an hour
+    driveToken = null;
+    return driveFetch(url, opts, false);
+  }
+  if (!res.ok) throw new Error(`Drive request failed (${res.status})`);
+  return res;
+}
+
+async function driveSave() {
+  if (!sourceImg) { toast('Open a photo first'); return; }
+  const btn = document.getElementById('lib-drive-save');
+  btn.disabled = true;
+  try {
+    const doc = await docWithImage(document.getElementById('lib-embed').checked);
+    const body = JSON.stringify(doc);
+    const meta = {name: docFileName(), mimeType:'application/json', appProperties:{safelight:'1'}};
+    const boundary = 'safelight' + Math.random().toString(36).slice(2);
+    const multipart =
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n` +
+      `--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
+
+    const existing = currentProject?.driveFileId;
+    const url = existing
+      ? `https://www.googleapis.com/upload/drive/v3/files/${existing}?uploadType=multipart&fields=id`
+      : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id';
+    const res = await driveFetch(url, {
+      method: existing ? 'PATCH' : 'POST',
+      headers: {'Content-Type': `multipart/related; boundary=${boundary}`},
+      body: multipart,
+    });
+    const saved = await res.json();
+    if (currentProject) currentProject.driveFileId = saved.id;
+    await saveToDevice(true);   // keep the device copy's Drive id in step
+    toast('Saved to Google Drive');
+    await renderDriveList();
+  } catch(err) {
+    if (err.message !== 'not connected') toast('Could not save to Drive');
+  } finally {
+    btn.disabled = !driveToken;
+  }
+}
+
+async function renderDriveList() {
+  const box = document.getElementById('lib-drive-list');
+  if (!driveToken) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="lib-empty">Loading…</div>';
+  try {
+    const q = encodeURIComponent("trashed=false and appProperties has {key='safelight' and value='1'}");
+    const res = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=modifiedTime desc&pageSize=25&fields=files(id,name,modifiedTime)`);
+    const {files = []} = await res.json();
+    if (!files.length) { box.innerHTML = '<div class="lib-empty">No edits in Drive yet</div>'; return; }
+    box.innerHTML = '';
+    for (const f of files) {
+      const row = document.createElement('div');
+      row.className = 'lib-row';
+      const meta = document.createElement('div');
+      meta.className = 'lib-meta';
+      meta.innerHTML = `<div class="lib-name"></div><div class="lib-sub">${new Date(f.modifiedTime).toLocaleString()}</div>`;
+      meta.querySelector('.lib-name').textContent = f.name;
+      const open = document.createElement('button');
+      open.textContent = 'Open';
+      open.addEventListener('click', () => driveOpen(f.id));
+      row.append(meta, open);
+      box.appendChild(row);
+    }
+  } catch(err) {
+    box.innerHTML = '<div class="lib-empty">Could not list Drive files</div>';
+  }
+}
+
+async function driveOpen(id) {
+  try {
+    const res = await driveFetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`);
+    await openEditDoc(await res.json());
+    if (currentProject) currentProject.driveFileId = id;
+  } catch(err) {
+    if (err.message !== 'not connected') toast('Could not open that Drive file');
+  }
+}
+
+function refreshDriveUI() {
+  const connected = !!driveToken;
+  document.getElementById('lib-drive-save').disabled = !connected;
+  document.getElementById('lib-drive-open').disabled = !connected;
+  document.getElementById('lib-drive-connect').textContent = connected ? 'Reconnect' : 'Connect Drive';
+  document.getElementById('lib-drive-note').innerHTML = connected
+    ? 'Connected. Edit files are saved to your Drive and only this app can read them.'
+    : (driveClientId()
+        ? 'Not connected yet. <a href="#" id="lib-drive-setup">Change client ID</a>.'
+        : 'Not connected. Needs a one-time Google client ID — <a href="#" id="lib-drive-setup">set up</a>.');
+  wireDriveSetupLink();
+}
+
+function openDriveSetup() {
+  document.getElementById('drive-origin').textContent = location.origin;
+  document.getElementById('drive-client-id').value = driveClientId();
+  document.getElementById('drive-setup').classList.add('open');
+}
+
+function wireDriveSetupLink() {
+  const link = document.getElementById('lib-drive-setup');
+  if (link) link.addEventListener('click', e => { e.preventDefault(); openDriveSetup(); });
+}
+
+// ── Saved-edits panel ───────────────────────────────────────────────────────
+function refreshLibraryStatus() {
+  const el = document.getElementById('lib-status');
+  if (!el) return;
+  if (!sourceImg) { el.textContent = 'No photo open'; return; }
+  const when = lastSavedAt ? new Date(lastSavedAt).toLocaleTimeString() : null;
+  const n = history.length;
+  el.textContent = `${sourceMeta?.name || 'photo'} · ${n} ${n === 1 ? 'edit' : 'edits'}` +
+    (when ? ` · saved ${when}` : ' · not saved yet');
+}
+
+async function renderLibraryList() {
+  const box = document.getElementById('lib-list');
+  if (!box) return;
+  let all = [];
+  try { all = await idbAll(); } catch(e) { box.innerHTML = '<div class="lib-empty">Device storage unavailable</div>'; return; }
+  if (!all.length) { box.innerHTML = '<div class="lib-empty">Nothing saved yet</div>'; return; }
+  all.sort((a,b) => b.savedAt - a.savedAt);
+  box.innerHTML = '';
+  for (const rec of all) {
+    const row = document.createElement('div');
+    row.className = 'lib-row';
+    if (rec.thumb) {
+      const img = document.createElement('img');
+      img.src = rec.thumb; img.alt = '';
+      row.appendChild(img);
+    }
+    const meta = document.createElement('div');
+    meta.className = 'lib-meta';
+    const name = document.createElement('div');
+    name.className = 'lib-name';
+    name.textContent = rec.name;
+    const sub = document.createElement('div');
+    sub.className = 'lib-sub';
+    sub.textContent = `${rec.edits} ${rec.edits === 1 ? 'edit' : 'edits'} · ${new Date(rec.savedAt).toLocaleString()}`;
+    meta.append(name, sub);
+    const open = document.createElement('button');
+    open.textContent = rec.id === currentProject?.id ? 'Reload' : 'Open';
+    open.addEventListener('click', () => openProject(rec.id));
+    const del = document.createElement('button');
+    del.className = 'lib-del';
+    del.textContent = 'Delete';
+    del.addEventListener('click', async () => { await idbDel(rec.id); renderLibraryList(); });
+    row.append(meta, open, del);
+    box.appendChild(row);
+  }
+}
+
+// ── Toast ───────────────────────────────────────────────────────────────────
+let toastTimer = null;
+function toast(msg, actionLabel, onAction, ms = 6000) {
+  const box = document.getElementById('toast');
+  const btn = document.getElementById('toast-action');
+  document.getElementById('toast-msg').textContent = msg;
+  btn.style.display = actionLabel ? '' : 'none';
+  btn.textContent = actionLabel || '';
+  btn.onclick = () => { box.classList.remove('open'); if (onAction) onAction(); };
+  box.classList.add('open');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => box.classList.remove('open'), ms);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2171,6 +2844,43 @@ function init() {
   document.getElementById('btn-edit').addEventListener('click', () => switchPanel('edit'));
   document.getElementById('btn-crop').addEventListener('click', () => switchPanel('crop'));
   document.getElementById('btn-presets').addEventListener('click', () => { switchPanel('presets'); buildPresetThumbs(); });
+  document.getElementById('btn-library').addEventListener('click', () => {
+    switchPanel('library');
+    refreshLibraryStatus();
+    renderLibraryList();
+  });
+
+  // Saved edits
+  document.getElementById('lib-save-device').addEventListener('click', () => saveToDevice(false));
+  document.getElementById('lib-save-file').addEventListener('click', saveEditFile);
+  document.getElementById('lib-open-file').addEventListener('click', () => document.getElementById('edit-file-input').click());
+  document.getElementById('edit-file-input').addEventListener('change', e => {
+    if (e.target.files[0]) openEditFile(e.target.files[0]);
+    e.target.value = '';
+  });
+  document.getElementById('lib-drive-connect').addEventListener('click', async () => {
+    if (await driveConnect()) renderDriveList();
+  });
+  document.getElementById('lib-drive-save').addEventListener('click', driveSave);
+  document.getElementById('lib-drive-open').addEventListener('click', renderDriveList);
+  wireDriveSetupLink();
+
+  const driveDlg = document.getElementById('drive-setup');
+  document.getElementById('drive-setup-cancel').addEventListener('click', () => driveDlg.classList.remove('open'));
+  driveDlg.addEventListener('click', e => { if (e.target === driveDlg) driveDlg.classList.remove('open'); });
+  document.getElementById('drive-setup-save').addEventListener('click', async () => {
+    const id = document.getElementById('drive-client-id').value.trim();
+    if (!id) { toast('Paste a client ID first'); return; }
+    localStorage.setItem(DRIVE_KEY, id);
+    driveDlg.classList.remove('open');
+    driveToken = null;
+    gisPromise = null;
+    if (await driveConnect()) renderDriveList();
+  });
+  refreshDriveUI();
+
+  // an in-flight edit is worth one last write before the tab goes away
+  window.addEventListener('pagehide', () => { if (sourceImg) saveToDevice(true); });
 
   // Crop buttons
   document.querySelectorAll('.ratio-btn').forEach(b => {
@@ -2199,18 +2909,21 @@ function init() {
     if (!baseCanvas) return;
     pushHistory('Rotate 90°');
     state.rotation = (state.rotation + 1) % 4;
+    geomOps.push({op:'rot90'});
     rotateBase90(); buildCropCanvas(); refreshTexture();
   });
   document.getElementById('crop-fliph-btn').addEventListener('click', () => {
     if (!baseCanvas) return;
     pushHistory('Flip horizontal');
     state.flipH = !state.flipH;
+    geomOps.push({op:'flip', axis:'h'});
     flipBase(true); buildCropCanvas(); refreshTexture();
   });
   document.getElementById('crop-flipv-btn').addEventListener('click', () => {
     if (!baseCanvas) return;
     pushHistory('Flip vertical');
     state.flipV = !state.flipV;
+    geomOps.push({op:'flip', axis:'v'});
     flipBase(false); buildCropCanvas(); refreshTexture();
   });
   document.getElementById('crop-apply').addEventListener('click', applyCrop);

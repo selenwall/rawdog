@@ -4,8 +4,9 @@
   publish = "."
   command = ""
 
-# The editor decodes photos entirely in the browser and makes no network
-# requests, so nothing needs to be reachable off-origin.
+# Photos are decoded and edited entirely in the browser, and edits are saved to
+# the device by default. The only off-origin traffic is Google Drive, and only
+# once the user connects it: accounts.google.com for sign-in, then the Drive API.
 [[headers]]
   for = "/*"
   [headers.values]
