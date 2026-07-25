@@ -151,6 +151,74 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
 #crop-apply:hover{background:#d4922e}
 #crop-reset{background:none;border:1px solid var(--border);color:var(--text-dim)}
 
+/* ── Library ── */
+#library-view{position:fixed;inset:0;z-index:40;background:var(--bg);display:none;flex-direction:column}
+#library-view.open{display:flex}
+#lib-top{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+#lib-heading{display:flex;flex-direction:column;gap:1px;min-width:0}
+#lib-title{font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lib-sub{font-size:11px;color:var(--text-dim)}
+#lib-top-right{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
+#lib-import{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}
+#lib-import:hover{background:#d4922e}
+#lib-main{flex:1;min-height:0;display:flex}
+
+#lib-albums{width:196px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:2px}
+.album-row{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--text);border:1px solid transparent}
+.album-row:hover{background:var(--panel)}
+.album-row.active{background:var(--panel);color:var(--accent)}
+.album-row.drop-target{border-color:var(--accent);background:rgba(232,168,56,.12)}
+.album-row svg{width:14px;height:14px;flex-shrink:0;opacity:.7}
+.album-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.album-count{font-size:10px;color:var(--text-dim);font-variant-numeric:tabular-nums}
+.album-more{background:none;border:none;color:var(--text-dim);cursor:pointer;padding:0 2px;font-size:14px;line-height:1;border-radius:3px;flex-shrink:0}
+.album-more:hover{color:var(--text)}
+.album-sep{height:1px;background:var(--border);margin:6px 2px}
+#lib-new-album{background:none;border:1px dashed var(--border);color:var(--text-dim);padding:7px;border-radius:6px;font-size:11px;cursor:pointer;text-align:left;padding-left:8px}
+#lib-new-album:hover{color:var(--text);border-color:var(--text-dim)}
+#lib-storage{margin-top:auto;padding:8px 4px 2px;font-size:10px;color:var(--text-dim);line-height:1.5}
+
+#lib-grid-wrap{flex:1;min-width:0;display:flex;flex-direction:column}
+#lib-selbar{display:none;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none}
+#lib-selbar::-webkit-scrollbar{display:none}
+#lib-selbar.visible{display:flex}
+#lib-selcount{font-size:11px;color:var(--text-dim);white-space:nowrap;margin-right:2px}
+.sel-btn{background:none;border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:5px;font-size:11px;cursor:pointer;white-space:nowrap}
+.sel-btn:hover{background:var(--panel)}
+.sel-btn.danger:hover{border-color:#e55;color:#e55}
+#lib-grid{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(136px,1fr));gap:8px;padding:10px;align-content:start}
+#lib-empty{display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--text-dim);padding:24px;text-align:center}
+#lib-empty.visible{display:flex}
+#lib-empty p{font-size:13px}
+#lib-empty small{font-size:11px;opacity:.6}
+
+.photo-tile{position:relative;aspect-ratio:1;border-radius:6px;overflow:hidden;background:#0a0a0a;cursor:pointer;border:2px solid transparent}
+.photo-tile img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.photo-tile.selected{border-color:var(--accent)}
+.photo-tile.current{border-color:var(--text-dim)}
+.tile-check{position:absolute;top:5px;left:5px;width:20px;height:20px;border-radius:50%;border:1.5px solid rgba(255,255,255,.75);background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;color:transparent}
+.photo-tile.selected .tile-check{background:var(--accent);border-color:var(--accent);color:#000}
+.tile-name{position:absolute;left:0;right:0;bottom:0;padding:12px 6px 4px;font-size:10px;color:#ddd;background:linear-gradient(transparent,rgba(0,0,0,.8));overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
+.tile-badge{position:absolute;top:5px;right:5px;font-size:9px;font-weight:600;color:#000;background:var(--accent);border-radius:3px;padding:1px 4px;pointer-events:none}
+
+#lib-menu{position:fixed;display:none;z-index:60;background:#222;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.5);min-width:160px;max-height:60vh;overflow-y:auto;padding:5px}
+#lib-menu.open{display:block}
+.menu-item{display:block;width:100%;text-align:left;background:none;border:none;color:var(--text);padding:7px 9px;border-radius:5px;font-size:12px;cursor:pointer}
+.menu-item:hover{background:var(--border)}
+.menu-item.danger{color:#e55}
+.menu-label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);padding:5px 9px 3px}
+.menu-empty{font-size:11px;color:var(--text-dim);padding:6px 9px}
+
+@media(max-width:760px){
+  #lib-main{flex-direction:column}
+  #lib-albums{width:100%;flex-direction:row;align-items:center;overflow-x:auto;overflow-y:hidden;border-right:none;border-bottom:1px solid var(--border);padding:8px;gap:5px;scrollbar-width:none}
+  #lib-albums::-webkit-scrollbar{display:none}
+  .album-row{white-space:nowrap;border:1px solid var(--border);border-radius:14px;padding:6px 10px}
+  .album-sep,#lib-storage{display:none}
+  #lib-new-album{white-space:nowrap;border-radius:14px;padding:6px 10px}
+  #lib-grid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px;padding:8px}
+}
+
 /* ── Scrollbar ── */
 #panel-scroll::-webkit-scrollbar{width:4px}
 #panel-scroll::-webkit-scrollbar-track{background:transparent}
@@ -166,15 +234,21 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
     <div id="compare-hint">Hold to compare</div>
     <div id="drop-overlay">
       <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-      <p id="drop-msg">Drop a RAW file here</p>
+      <p id="drop-msg">Drop RAW files here</p>
       <small>Sony ARW · DNG · CR2 · NEF · RAF</small>
-      <button id="open-btn">Open file</button>
-      <input type="file" id="file-input" accept=".arw,.dng,.cr2,.nef,.raf,.ARW,.DNG,.CR2,.NEF,.RAF,image/x-sony-arw,image/x-adobe-dng">
+      <div style="display:flex;gap:8px;pointer-events:all">
+        <button id="open-btn">Open files</button>
+        <button id="drop-lib-btn" class="tool-btn" style="display:none">Library</button>
+      </div>
+      <input type="file" id="file-input" multiple accept=".arw,.dng,.cr2,.nef,.raf,.ARW,.DNG,.CR2,.NEF,.RAF,image/x-sony-arw,image/x-adobe-dng,image/jpeg,image/png">
     </div>
   </div>
 
   <div id="sidebar">
     <div id="toolbar">
+      <button class="tool-btn icon-btn" id="toolbar-lib-btn" title="Library" aria-label="Library">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      </button>
       <button class="tool-btn icon-btn" id="toolbar-open-btn" title="Open file" aria-label="Open file">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
       </button>
@@ -288,6 +362,41 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
     </div>
   </div>
 </div>
+
+<!-- ── Library ── -->
+<div id="library-view">
+  <div id="lib-top">
+    <div id="lib-heading">
+      <span id="lib-title">All Photos</span>
+      <span id="lib-sub">No photos yet</span>
+    </div>
+    <div id="lib-top-right">
+      <button class="tool-btn" id="lib-import">+ Import</button>
+      <button class="tool-btn" id="lib-close" style="display:none">Back to photo</button>
+    </div>
+  </div>
+  <div id="lib-main">
+    <div id="lib-albums"></div>
+    <div id="lib-grid-wrap">
+      <div id="lib-selbar">
+        <span id="lib-selcount">0 selected</span>
+        <button class="sel-btn" id="sel-add">Add to album…</button>
+        <button class="sel-btn" id="sel-remove" style="display:none">Remove from album</button>
+        <button class="sel-btn danger" id="sel-delete">Delete</button>
+        <button class="sel-btn" id="sel-clear">Cancel</button>
+      </div>
+      <div id="lib-grid"></div>
+      <div id="lib-empty">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".3"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="9" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        <p id="lib-empty-msg">No photos yet</p>
+        <small>Import RAW files to build your library</small>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="lib-input" multiple style="display:none" accept=".arw,.dng,.cr2,.nef,.raf,.ARW,.DNG,.CR2,.NEF,.RAF,image/x-sony-arw,image/x-adobe-dng,image/jpeg,image/png">
+</div>
+
+<div id="lib-menu"></div>
 
 <div id="export-menu">
   <div class="exp-row"><span>Format</span><div class="exp-btns">
@@ -445,6 +554,8 @@ function extractJPEGs(buf) {
   return [...parseTIFFPreviews(buf), ...parseRAFPreview(buf), ...scanJPEGs(buf)];
 }
 
+// resolves {img, data} — data is the ArrayBuffer that decoded, so the library can
+// store exactly the bytes the editor works from
 function loadBestJPEG(candidates) {
   return new Promise((resolve, reject) => {
     if (!candidates.length) { reject(new Error('No embedded JPEG found')); return; }
@@ -453,15 +564,31 @@ function loadBestJPEG(candidates) {
     let idx = 0;
     function tryNext() {
       if (idx >= sorted.length) { reject(new Error('No valid JPEG found')); return; }
-      const blob = new Blob([sorted[idx++]], {type:'image/jpeg'});
+      const data = sorted[idx++];
+      const blob = new Blob([data], {type:'image/jpeg'});
       const url  = URL.createObjectURL(blob);
       const img  = new Image();
-      img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+      img.onload = () => { URL.revokeObjectURL(url); resolve({img, data}); };
       img.onerror = () => { URL.revokeObjectURL(url); tryNext(); };
       img.src = url;
     }
     tryNext();
   });
+}
+
+// decode any image blob (stored preview, baked base, plain JPEG/PNG file)
+function decodeBlob(blob) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload  = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not decode image')); };
+    img.src = url;
+  });
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise(res => canvas.toBlob(b => res(b), type, quality));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -816,6 +943,7 @@ function render() {
 function scheduleRender() {
   if (rafId) cancelAnimationFrame(rafId);
   rafId = requestAnimationFrame(render);
+  markDirty(); // debounced auto-save of the open photo's edits
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1326,6 +1454,8 @@ function applyCrop() {
   baked.height = Math.round(ch);
   baked.getContext('2d').drawImage(cropCanvas, cx0, cy0, cw, ch, 0, 0, baked.width, baked.height);
   baseCanvas = baked;
+  hasBakedGeom = true;   // no longer reproducible from sourceImg + state
+  geomDirty = true;
   state.straighten = 0;
   document.getElementById('s-straighten').value = 0;
   document.getElementById('v-straighten').textContent = '0°';
@@ -1343,6 +1473,8 @@ function resetCrop() {
   cropDrag = null;
   state.straighten = 0;
   rebuildBase();
+  hasBakedGeom = false;  // back to a state-replayable geometry
+  geomDirty = false;
   document.getElementById('s-straighten').value = 0;
   document.getElementById('v-straighten').textContent = '0°';
   document.getElementById('crop-overlay').style.display='none';
@@ -1411,7 +1543,7 @@ function buildPresetThumbs() {
       grid.appendChild(lbl);
     }
     const div = document.createElement('div');
-    div.className = 'preset-item' + (i===0?' active':'');
+    div.className = 'preset-item' + (i===activePreset?' active':'');
     div.dataset.idx = i;
 
     const thumb = document.createElement('canvas');
@@ -1695,7 +1827,8 @@ function pushHistory(label, snap) {
 }
 
 function restoreSnap(snap) {
-  const geomChanged = baseCanvas !== snap.baseCanvas || state.straighten !== snap.straighten;
+  const baseChanged  = baseCanvas !== snap.baseCanvas;
+  const geomChanged  = baseChanged || state.straighten !== snap.straighten;
   for (const k of PARAMS) state[k] = snap.params[k];
   state.curvePoints = JSON.parse(JSON.stringify(snap.curvePoints));
   state.splitShadow = snap.splitShadow.slice();
@@ -1713,12 +1846,15 @@ function restoreSnap(snap) {
   document.getElementById('v-straighten').textContent = state.straighten+'°';
   drawCurve();
   if (geomChanged) {
+    // the restored base may hold a crop, so keep a copy of it on the next save
+    if (baseChanged) { hasBakedGeom = true; geomDirty = true; }
     buildCropCanvas();
     refreshTexture();
   } else {
     uploadLUT(buildCurveLUT(state.curvePoints));
     scheduleRender();
   }
+  markDirty();
 }
 
 function revertTo(i) {
@@ -1837,61 +1973,72 @@ function wireTabs() {
 // ─────────────────────────────────────────────────────────────────────────────
 // File loading
 // ─────────────────────────────────────────────────────────────────────────────
-async function loadFile(file) {
-  const overlay = document.getElementById('drop-overlay');
-  const msg = document.getElementById('drop-msg');
-  overlay.classList.remove('hidden');
-  msg.style.color = '';
-  msg.textContent = 'Loading…';
-  let img;
-  try {
-    const buf = await file.arrayBuffer();
-    const candidates = extractJPEGs(buf);
-    img = await loadBestJPEG(candidates.length ? candidates : [buf]);
-  } catch(err) {
-    // fallback: treat as JPEG/PNG directly
-    try {
-      img = await new Promise((res,rej) => {
-        const url = URL.createObjectURL(file);
-        const im = new Image();
-        im.onload = () => { URL.revokeObjectURL(url); res(im); };
-        im.onerror = () => { URL.revokeObjectURL(url); rej(err); };
-        im.src = url;
-      });
-    } catch(e2) {
-      msg.style.color = '#e55';
-      msg.textContent = `Failed to load: ${err.message}`;
-      return;
-    }
-  }
-  sourceImg = img;
-  msg.textContent = 'Drop a RAW file here';
-  overlay.classList.add('hidden');
 
-  // reset state
-  Object.assign(state, {rotation:0,flipH:false,flipV:false,straighten:0});
-  for (const k of PARAMS) state[k] = 0;
-  state.splitShadow = [0,0,0];
-  state.splitHigh   = [0,0,0];
-  state.curvePoints = [{x:0,y:0},{x:1,y:1}];
-
-  // reset sliders UI
+// push the current state out to the sliders, curve and preset grid
+function syncControls() {
   for (const k of PARAMS) {
     const el = document.getElementById('s-'+k);
     const vl = document.getElementById('v-'+k);
     if (el) el.value = state[k];
     if (vl) vl.textContent = formatVal(k, state[k]);
   }
-  document.getElementById('s-straighten').value = 0;
-  document.getElementById('v-straighten').textContent = '0°';
+  document.getElementById('s-straighten').value = state.straighten;
+  document.getElementById('v-straighten').textContent = state.straighten + '°';
   drawCurve();
+}
+
+// Decode a file to the working image, plus the bytes that decoded so the
+// library can store exactly what the editor renders from.
+async function decodeSourceFile(file) {
+  try {
+    const buf = await file.arrayBuffer();
+    const candidates = extractJPEGs(buf);
+    const {img, data} = await loadBestJPEG(candidates.length ? candidates : [buf]);
+    return {img, blob: new Blob([data], {type:'image/jpeg'})};
+  } catch(err) {
+    // fallback: treat as JPEG/PNG directly
+    try {
+      return {img: await decodeBlob(file), blob: file};
+    } catch(e2) {
+      throw err;
+    }
+  }
+}
+
+// Put a decoded image on screen. `edits` restores a saved look; `bakedBaseImg`
+// is a previously cropped/rotated base that replaces the geometry rebuild.
+function applyImage(img, name, edits, bakedBaseImg) {
+  sourceImg = img;
+
+  // reset state, then layer the saved edits on top
+  Object.assign(state, {rotation:0,flipH:false,flipV:false,straighten:0});
+  for (const k of PARAMS) state[k] = 0;
+  state.splitShadow = [0,0,0];
+  state.splitHigh   = [0,0,0];
+  state.curvePoints = [{x:0,y:0},{x:1,y:1}];
+  activePreset = 0;
+  if (edits) applyEdits(edits);
+  syncControls();
 
   // GL first so rebuildBase can respect MAX_TEXTURE_SIZE
   if (!gl) {
     initGL(document.getElementById('main-canvas'));
-    if (!gl) return;
+    if (!gl) return false;
   }
-  rebuildBase();
+  if (bakedBaseImg) {
+    const maxTex = maxTexSize();
+    const s = Math.min(1, maxTex / Math.max(bakedBaseImg.naturalWidth, bakedBaseImg.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width  = Math.max(1, Math.round(bakedBaseImg.naturalWidth  * s));
+    c.height = Math.max(1, Math.round(bakedBaseImg.naturalHeight * s));
+    c.getContext('2d').drawImage(bakedBaseImg, 0, 0, c.width, c.height);
+    baseCanvas = c;
+    hasBakedGeom = true;
+  } else {
+    rebuildBase();
+    hasBakedGeom = false;
+  }
+  geomDirty = false;
   buildCropCanvas();
 
   uploadLUT(buildCurveLUT(state.curvePoints));
@@ -1903,7 +2050,40 @@ async function loadFile(file) {
   switchPanel('edit');
   clearHistory();
 
-  document.title = `Safelight — ${file.name}`;
+  document.title = `Safelight — ${name}`;
+  return true;
+}
+
+// text === '' restores the idle prompt and hides the overlay once a photo is up
+function setDropMessage(text, isError) {
+  const overlay = document.getElementById('drop-overlay');
+  const msg = document.getElementById('drop-msg');
+  msg.style.color = isError ? '#e55' : '';
+  if (text) {
+    msg.textContent = text;
+    overlay.classList.remove('hidden');
+  } else {
+    msg.textContent = 'Drop RAW files here';
+    if (cropCanvas) overlay.classList.add('hidden');
+  }
+}
+
+// Import into the library, then open — the "straight into the editor" path.
+async function loadFile(file) {
+  const ids = await importFiles([file]);
+  if (ids.length) await openPhoto(ids[0]);
+}
+
+// Dropped or picked files: one goes straight to the editor, several land in the
+// library. While the library is open, everything imports into the current album.
+async function handleIncomingFiles(files) {
+  const list = [...files];
+  if (!list.length) return;
+  if (libIsOpen()) { await importFiles(list); return; }
+  if (list.length === 1) { await loadFile(list[0]); return; }
+  await importFiles(list);
+  setDropMessage('');
+  await openLibrary();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2082,24 +2262,620 @@ function endCompare(saved) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Library — photos and albums persisted in IndexedDB
+//
+// Only the extracted preview JPEG is stored, which is exactly the pixel data the
+// editor works from, so a stored photo re-opens identically. Slider/curve/crop
+// state travels with each photo and is saved automatically while editing.
+// ─────────────────────────────────────────────────────────────────────────────
+const DB_NAME = 'safelight', DB_VER = 1;
+let dbPromise = null;
+
+function openDB() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('photos')) {
+        db.createObjectStore('photos', {keyPath:'id'}).createIndex('added','added');
+      }
+      if (!db.objectStoreNames.contains('albums')) {
+        db.createObjectStore('albums', {keyPath:'id'});
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+  return dbPromise;
+}
+
+function dbRun(store, mode, fn) {
+  return openDB().then(db => new Promise((resolve, reject) => {
+    const tx  = db.transaction(store, mode);
+    const req = fn(tx.objectStore(store));
+    tx.oncomplete = () => resolve(req ? req.result : undefined);
+    tx.onerror    = () => reject(tx.error);
+    tx.onabort    = () => reject(tx.error);
+  }));
+}
+const dbAll = s      => dbRun(s, 'readonly',  st => st.getAll());
+const dbPut = (s, v) => dbRun(s, 'readwrite', st => st.put(v));
+const dbDel = (s, k) => dbRun(s, 'readwrite', st => st.delete(k));
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+const lib = {
+  photos: [],        // all photos, newest first
+  albums: [],        // {id, name, created}
+  album: 'all',      // album currently shown, or 'all'
+  selection: new Set(),
+  currentId: null,   // photo open in the editor
+  loaded: false,
+};
+let thumbURLs = [];               // object URLs live in the grid; revoked on re-render
+let hasBakedGeom = false;         // baseCanvas holds a crop that state can't replay
+let geomDirty = false;            // …and it changed since the last save
+let saveTimer = null;
+
+// ── Edit state ↔ stored record ──
+function serializeEdits() {
+  const e = {
+    params: {},
+    curvePoints: JSON.parse(JSON.stringify(state.curvePoints)),
+    splitShadow: state.splitShadow.slice(),
+    splitHigh:   state.splitHigh.slice(),
+    straighten: state.straighten,
+    rotation: state.rotation, flipH: state.flipH, flipV: state.flipV,
+    preset: activePreset,
+  };
+  for (const k of PARAMS) e.params[k] = state[k];
+  return e;
+}
+
+function applyEdits(e) {
+  for (const k of PARAMS) state[k] = (e.params && e.params[k]) || 0;
+  if (Array.isArray(e.curvePoints) && e.curvePoints.length >= 2)
+    state.curvePoints = JSON.parse(JSON.stringify(e.curvePoints));
+  state.splitShadow = (e.splitShadow || [0,0,0]).slice();
+  state.splitHigh   = (e.splitHigh   || [0,0,0]).slice();
+  state.straighten  = e.straighten || 0;
+  state.rotation = e.rotation || 0;
+  state.flipH = !!e.flipH; state.flipV = !!e.flipV;
+  activePreset = e.preset || 0;
+}
+
+function isEdited(rec) {
+  if (rec.base) return true;
+  const e = rec.edits;
+  if (!e) return false;
+  if (e.straighten || e.rotation || e.flipH || e.flipV) return true;
+  if (e.params && PARAMS.some(k => e.params[k])) return true;
+  const c = e.curvePoints;
+  return !!(c && (c.length > 2 || (c.length === 2 && (c[0].y !== 0 || c[1].y !== 1))));
+}
+
+// ── Auto-save the open photo ──
+function markDirty() {
+  if (!lib.currentId) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveCurrentEdits, 1200);
+}
+
+async function saveCurrentEdits() {
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  const rec = lib.photos.find(p => p.id === lib.currentId);
+  if (!rec) return;
+  rec.edits = serializeEdits();
+  if (hasBakedGeom) {
+    // a baked crop can't be replayed from state — keep a copy of the base
+    if (geomDirty && baseCanvas) {
+      rec.base = await canvasToBlob(baseCanvas, 'image/jpeg', .95);
+      geomDirty = false;
+    }
+  } else if (rec.base) {
+    rec.base = null;
+  }
+  try { await dbPut('photos', rec); }
+  catch(err) { console.warn('Could not save edits', err); }
+}
+
+// ── Import ──
+async function makeThumb(img, max) {
+  const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas');
+  c.width  = Math.max(1, Math.round(img.naturalWidth  * s));
+  c.height = Math.max(1, Math.round(img.naturalHeight * s));
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return canvasToBlob(c, 'image/jpeg', .8);
+}
+
+function setImportStatus(text, isError) {
+  const sub = document.getElementById('lib-sub');
+  if (libIsOpen()) { sub.textContent = text; sub.style.color = isError ? '#e55' : ''; }
+  else setDropMessage(text, isError);
+}
+
+// Adds every file to the library; returns the ids that imported successfully.
+async function importFiles(files) {
+  const list = [...files].filter(f => f && f.size > 0);
+  if (!list.length) return [];
+  await ensureLibrary();
+  const albumId = lib.album === 'all' ? null : lib.album;
+  const ids = [], failed = [];
+  let quotaHit = false;
+
+  for (let i = 0; i < list.length; i++) {
+    const f = list[i];
+    setImportStatus(list.length > 1 ? `Importing ${i+1} of ${list.length}… ${f.name}` : 'Loading…');
+    try {
+      const {img, blob} = await decodeSourceFile(f);
+      const rec = {
+        id: uid(), name: f.name, added: Date.now(),
+        w: img.naturalWidth, h: img.naturalHeight,
+        preview: blob, thumb: await makeThumb(img, 400),
+        base: null, edits: null, albums: albumId ? [albumId] : [],
+      };
+      await dbPut('photos', rec);
+      lib.photos.unshift(rec);
+      ids.push(rec.id);
+    } catch(err) {
+      if (err && err.name === 'QuotaExceededError') { quotaHit = true; break; }
+      failed.push(f.name);
+      console.warn('Import failed:', f.name, err);
+    }
+  }
+
+  if (libIsOpen()) renderLibrary();
+  updateDropOverlay();
+  if (quotaHit)        setImportStatus('Out of browser storage — delete some photos and try again', true);
+  else if (failed.length === list.length) setImportStatus(`Could not read ${failed[0]}`, true);
+  else if (failed.length) setImportStatus(`${failed.length} file${failed.length>1?'s':''} could not be read`, true);
+  else if (libIsOpen()) updateLibHeader();
+  return ids;
+}
+
+// ── Albums ──
+let libLoad = null;
+function ensureLibrary() {
+  if (!libLoad) libLoad = (async () => {
+    try {
+      const [photos, albums] = await Promise.all([dbAll('photos'), dbAll('albums')]);
+      lib.photos = photos.sort((a,b) => b.added - a.added);
+      lib.albums = albums.sort((a,b) => a.created - b.created);
+    } catch(err) {
+      console.warn('Library unavailable', err);
+    }
+    lib.loaded = true;
+  })();
+  return libLoad;
+}
+
+function albumById(id) { return lib.albums.find(a => a.id === id) || null; }
+function albumPhotos()  {
+  return lib.album === 'all' ? lib.photos
+                             : lib.photos.filter(p => (p.albums || []).includes(lib.album));
+}
+function countIn(id) { return lib.photos.filter(p => (p.albums || []).includes(id)).length; }
+
+async function createAlbum() {
+  const name = (prompt('Album name') || '').trim();
+  if (!name) return null;
+  const album = {id: uid(), name, created: Date.now()};
+  lib.albums.push(album);
+  await dbPut('albums', album);
+  lib.album = album.id;
+  clearSelection();
+  renderLibrary();
+  return album;
+}
+
+async function renameAlbum(id) {
+  const album = albumById(id);
+  if (!album) return;
+  const name = (prompt('Rename album', album.name) || '').trim();
+  if (!name) return;
+  album.name = name;
+  await dbPut('albums', album);
+  renderLibrary();
+}
+
+async function deleteAlbum(id) {
+  const album = albumById(id);
+  if (!album) return;
+  if (!confirm(`Delete the album “${album.name}”? The photos stay in your library.`)) return;
+  const touched = lib.photos.filter(p => (p.albums || []).includes(id));
+  for (const p of touched) {
+    p.albums = p.albums.filter(a => a !== id);
+    await dbPut('photos', p);
+  }
+  lib.albums = lib.albums.filter(a => a.id !== id);
+  await dbDel('albums', id);
+  if (lib.album === id) lib.album = 'all';
+  renderLibrary();
+}
+
+async function addToAlbum(ids, albumId) {
+  for (const id of ids) {
+    const p = lib.photos.find(x => x.id === id);
+    if (!p) continue;
+    p.albums = p.albums || [];
+    if (!p.albums.includes(albumId)) { p.albums.push(albumId); await dbPut('photos', p); }
+  }
+  clearSelection();
+  renderLibrary();
+}
+
+async function removeFromAlbum(ids, albumId) {
+  for (const id of ids) {
+    const p = lib.photos.find(x => x.id === id);
+    if (!p || !p.albums) continue;
+    p.albums = p.albums.filter(a => a !== albumId);
+    await dbPut('photos', p);
+  }
+  clearSelection();
+  renderLibrary();
+}
+
+async function deletePhotos(ids) {
+  const n = ids.length;
+  if (!confirm(`Delete ${n} photo${n>1?'s':''} from the library? This cannot be undone.`)) return;
+  for (const id of ids) {
+    await dbDel('photos', id);
+    if (lib.currentId === id) lib.currentId = null;
+  }
+  lib.photos = lib.photos.filter(p => !ids.includes(p.id));
+  clearSelection();
+  renderLibrary();
+  updateDropOverlay();
+}
+
+// ── Opening ──
+async function openPhoto(id) {
+  await saveCurrentEdits();
+  const rec = lib.photos.find(p => p.id === id);
+  if (!rec) return;
+  closeLibrary();
+  setDropMessage('Loading…');
+  try {
+    const img   = await decodeBlob(rec.preview);
+    const baked = rec.base ? await decodeBlob(rec.base) : null;
+    lib.currentId = id;
+    if (applyImage(img, rec.name, rec.edits, baked)) setDropMessage('');
+    else setDropMessage('WebGL is unavailable in this browser', true);
+  } catch(err) {
+    lib.currentId = null;
+    setDropMessage('Could not open ' + rec.name, true);
+  }
+  updateDropOverlay();
+}
+
+// ── Rendering ──
+function libIsOpen() { return document.getElementById('library-view').classList.contains('open'); }
+
+function updateLibHeader() {
+  const album = lib.album === 'all' ? null : albumById(lib.album);
+  const list  = albumPhotos();
+  document.getElementById('lib-title').textContent = album ? album.name : 'All Photos';
+  const sub = document.getElementById('lib-sub');
+  sub.style.color = '';
+  sub.textContent = list.length ? `${list.length} photo${list.length===1?'':'s'}`
+                                : (album ? 'Empty album' : 'No photos yet');
+  document.getElementById('lib-close').style.display = lib.currentId ? '' : 'none';
+}
+
+function renderAlbums() {
+  const wrap = document.getElementById('lib-albums');
+  wrap.innerHTML = '';
+
+  const makeRow = (id, name, count, isUser) => {
+    const row = document.createElement('div');
+    row.className = 'album-row' + (lib.album === id ? ' active' : '');
+    row.innerHTML = isUser
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>';
+    const label = document.createElement('span');
+    label.className = 'album-name';
+    label.textContent = name;
+    row.appendChild(label);
+    const cnt = document.createElement('span');
+    cnt.className = 'album-count';
+    cnt.textContent = count;
+    row.appendChild(cnt);
+    if (isUser) {
+      const more = document.createElement('button');
+      more.className = 'album-more';
+      more.textContent = '⋯';
+      more.title = 'Album options';
+      more.addEventListener('click', e => {
+        e.stopPropagation();
+        openMenu(more, [
+          {label:'Rename…', onClick:() => renameAlbum(id)},
+          {label:'Delete album', danger:true, onClick:() => deleteAlbum(id)},
+        ]);
+      });
+      row.appendChild(more);
+    }
+    row.addEventListener('click', () => {
+      lib.album = id;
+      clearSelection();
+      renderLibrary();
+    });
+    // drag photos onto an album to file them
+    row.addEventListener('dragover', e => {
+      if (!dragIds.length || !isUser) return;
+      e.preventDefault();
+      row.classList.add('drop-target');
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drop-target'));
+    row.addEventListener('drop', e => {
+      row.classList.remove('drop-target');
+      if (!dragIds.length || !isUser) return;
+      e.preventDefault();
+      addToAlbum(dragIds.slice(), id);
+    });
+    wrap.appendChild(row);
+    return row;
+  };
+
+  makeRow('all', 'All Photos', lib.photos.length, false);
+  const sep = document.createElement('div');
+  sep.className = 'album-sep';
+  wrap.appendChild(sep);
+  for (const a of lib.albums) makeRow(a.id, a.name, countIn(a.id), true);
+
+  const add = document.createElement('button');
+  add.id = 'lib-new-album';
+  add.textContent = '+ New album';
+  add.addEventListener('click', createAlbum);
+  wrap.appendChild(add);
+
+  const storage = document.createElement('div');
+  storage.id = 'lib-storage';
+  wrap.appendChild(storage);
+  updateStorageInfo();
+}
+
+let dragIds = [];
+
+function renderGrid() {
+  const grid = document.getElementById('lib-grid');
+  thumbURLs.forEach(URL.revokeObjectURL);
+  thumbURLs = [];
+  grid.innerHTML = '';
+  const list = albumPhotos();
+
+  const empty = document.getElementById('lib-empty');
+  empty.classList.toggle('visible', list.length === 0);
+  grid.style.display = list.length ? '' : 'none';
+  if (!list.length) {
+    document.getElementById('lib-empty-msg').textContent =
+      lib.album === 'all' ? 'No photos yet' : 'This album is empty';
+    return;
+  }
+
+  for (const p of list) {
+    const tile = document.createElement('div');
+    tile.className = 'photo-tile'
+      + (lib.selection.has(p.id) ? ' selected' : '')
+      + (lib.currentId === p.id ? ' current' : '');
+    tile.draggable = true;
+    tile.title = p.name;
+    tile.dataset.id = p.id;
+
+    const url = URL.createObjectURL(p.thumb);
+    thumbURLs.push(url);
+    const im = document.createElement('img');
+    im.src = url;
+    im.alt = p.name;
+    im.loading = 'lazy';
+    tile.appendChild(im);
+
+    const check = document.createElement('div');
+    check.className = 'tile-check';
+    check.textContent = '✓';
+    check.title = 'Select';
+    check.addEventListener('click', e => { e.stopPropagation(); toggleSelect(p.id); });
+    tile.appendChild(check);
+
+    if (isEdited(p)) {
+      const badge = document.createElement('div');
+      badge.className = 'tile-badge';
+      badge.textContent = 'Edited';
+      tile.appendChild(badge);
+    }
+
+    const name = document.createElement('div');
+    name.className = 'tile-name';
+    name.textContent = p.name;
+    tile.appendChild(name);
+
+    tile.addEventListener('click', () => {
+      if (lib.selection.size) toggleSelect(p.id);   // in selection mode, tap toggles
+      else openPhoto(p.id);
+    });
+    tile.addEventListener('dragstart', e => {
+      dragIds = lib.selection.has(p.id) ? [...lib.selection] : [p.id];
+      e.dataTransfer.effectAllowed = 'copy';
+      e.dataTransfer.setData('text/plain', dragIds.join(','));
+    });
+    tile.addEventListener('dragend', () => { dragIds = []; });
+    grid.appendChild(tile);
+  }
+}
+
+function renderLibrary() {
+  renderAlbums();
+  renderGrid();
+  renderSelBar();
+  updateLibHeader();
+}
+
+async function updateStorageInfo() {
+  const el = document.getElementById('lib-storage');
+  if (!el) return;
+  const n = lib.photos.length;
+  let txt = `${n} photo${n===1?'':'s'} stored`;
+  if (navigator.storage && navigator.storage.estimate) {
+    try {
+      const {usage} = await navigator.storage.estimate();
+      if (usage) txt += ' · ' + (usage < 1048576 ? Math.round(usage/1024) + ' KB'
+                     : usage < 1073741824 ? (usage/1048576).toFixed(1) + ' MB'
+                     : (usage/1073741824).toFixed(2) + ' GB');
+    } catch(err) { /* estimate is optional */ }
+  }
+  el.textContent = txt;
+}
+
+// ── Selection ── (tiles are patched in place so thumbnails don't reload)
+function toggleSelect(id) {
+  if (lib.selection.has(id)) lib.selection.delete(id);
+  else lib.selection.add(id);
+  const tile = document.querySelector('.photo-tile[data-id="' + id + '"]');
+  if (tile) tile.classList.toggle('selected', lib.selection.has(id));
+  renderSelBar();
+}
+
+function clearSelection() {
+  lib.selection.clear();
+  document.querySelectorAll('.photo-tile.selected').forEach(t => t.classList.remove('selected'));
+  renderSelBar();
+}
+
+function renderSelBar() {
+  const bar = document.getElementById('lib-selbar');
+  const n = lib.selection.size;
+  bar.classList.toggle('visible', n > 0);
+  document.getElementById('lib-selcount').textContent = `${n} selected`;
+  document.getElementById('sel-remove').style.display = lib.album === 'all' ? 'none' : '';
+}
+
+// ── Small popup menu ──
+function openMenu(anchor, items) {
+  const menu = document.getElementById('lib-menu');
+  menu.innerHTML = '';
+  for (const it of items) {
+    if (it.header) {
+      const h = document.createElement('div');
+      h.className = 'menu-label';
+      h.textContent = it.label;
+      menu.appendChild(h);
+      continue;
+    }
+    if (it.empty) {
+      const d = document.createElement('div');
+      d.className = 'menu-empty';
+      d.textContent = it.label;
+      menu.appendChild(d);
+      continue;
+    }
+    const b = document.createElement('button');
+    b.className = 'menu-item' + (it.danger ? ' danger' : '');
+    b.textContent = it.label;
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      closeMenu();
+      it.onClick();
+    });
+    menu.appendChild(b);
+  }
+  menu.classList.add('open');
+  const r = anchor.getBoundingClientRect();
+  const mw = menu.offsetWidth, mh = menu.offsetHeight;
+  menu.style.left = Math.min(window.innerWidth - mw - 8, Math.max(8, r.left)) + 'px';
+  menu.style.top  = (r.bottom + 4 + mh > window.innerHeight ? Math.max(8, r.top - 4 - mh) : r.bottom + 4) + 'px';
+}
+
+function closeMenu() { document.getElementById('lib-menu').classList.remove('open'); }
+
+// ── Open / close ──
+async function openLibrary() {
+  await saveCurrentEdits();
+  await ensureLibrary();
+  document.getElementById('library-view').classList.add('open');
+  renderLibrary();
+}
+
+function closeLibrary() {
+  document.getElementById('library-view').classList.remove('open');
+  closeMenu();
+  lib.selection.clear();
+}
+
+function updateDropOverlay() {
+  const btn = document.getElementById('drop-lib-btn');
+  if (btn) btn.style.display = lib.photos.length ? '' : 'none';
+}
+
+function wireLibrary() {
+  const pick = document.getElementById('lib-input');
+  document.getElementById('lib-import').addEventListener('click', () => pick.click());
+  pick.addEventListener('change', e => {
+    if (e.target.files.length) importFiles(e.target.files);
+    e.target.value = '';
+  });
+  document.getElementById('toolbar-lib-btn').addEventListener('click', openLibrary);
+  document.getElementById('drop-lib-btn').addEventListener('click', openLibrary);
+  document.getElementById('lib-close').addEventListener('click', closeLibrary);
+
+  document.getElementById('sel-clear').addEventListener('click', clearSelection);
+  document.getElementById('sel-delete').addEventListener('click', () => deletePhotos([...lib.selection]));
+  document.getElementById('sel-remove').addEventListener('click', () => {
+    if (lib.album !== 'all') removeFromAlbum([...lib.selection], lib.album);
+  });
+  document.getElementById('sel-add').addEventListener('click', e => {
+    e.stopPropagation();
+    const ids = [...lib.selection];
+    const items = [{label:'Add to album', header:true}];
+    if (!lib.albums.length) items.push({label:'No albums yet', empty:true});
+    for (const a of lib.albums) items.push({label:a.name, onClick:() => addToAlbum(ids, a.id)});
+    items.push({label:'+ New album…', onClick: async () => {
+      const album = await createAlbum();
+      if (album) addToAlbum(ids, album.id);
+    }});
+    openMenu(e.currentTarget, items);
+  });
+
+  document.addEventListener('click', closeMenu);
+  document.getElementById('lib-menu').addEventListener('click', e => e.stopPropagation());
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closeMenu();
+      if (libIsOpen()) { if (lib.selection.size) clearSelection(); else if (lib.currentId) closeLibrary(); }
+    }
+  });
+
+  // flush pending edits when the tab goes away
+  document.addEventListener('visibilitychange', () => { if (document.hidden) saveCurrentEdits(); });
+  window.addEventListener('pagehide', () => { saveCurrentEdits(); });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Event wiring
 // ─────────────────────────────────────────────────────────────────────────────
 function init() {
   wireSliders();
   wireTabs();
+  wireLibrary();
 
-  // Drag & drop — anywhere on the page
-  window.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
-  window.addEventListener('drop', e => {
+  // Drag & drop — anywhere on the page (files only; photo tiles drag internally)
+  window.addEventListener('dragover', e => {
+    if (!e.dataTransfer.types || !e.dataTransfer.types.includes('Files')) return;
     e.preventDefault();
-    const f = e.dataTransfer.files && e.dataTransfer.files[0];
-    if (f) loadFile(f);
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  window.addEventListener('drop', e => {
+    const files = e.dataTransfer.files;
+    if (!files || !files.length) return;
+    e.preventDefault();
+    handleIncomingFiles(files);
   });
   const openPicker = () => document.getElementById('file-input').click();
   document.getElementById('open-btn').addEventListener('click', openPicker);
   document.getElementById('toolbar-open-btn').addEventListener('click', openPicker);
   document.getElementById('file-input').addEventListener('change', e => {
-    if (e.target.files[0]) loadFile(e.target.files[0]);
+    if (e.target.files.length) handleIncomingFiles(e.target.files);
     e.target.value = ''; // allow re-selecting the same file
   });
 
@@ -2135,18 +2911,21 @@ function init() {
     if (!baseCanvas) return;
     pushHistory('Rotate 90°');
     state.rotation = (state.rotation + 1) % 4;
+    geomDirty = true;
     rotateBase90(); buildCropCanvas(); refreshTexture();
   });
   document.getElementById('crop-fliph-btn').addEventListener('click', () => {
     if (!baseCanvas) return;
     pushHistory('Flip horizontal');
     state.flipH = !state.flipH;
+    geomDirty = true;
     flipBase(true); buildCropCanvas(); refreshTexture();
   });
   document.getElementById('crop-flipv-btn').addEventListener('click', () => {
     if (!baseCanvas) return;
     pushHistory('Flip vertical');
     state.flipV = !state.flipV;
+    geomDirty = true;
     flipBase(false); buildCropCanvas(); refreshTexture();
   });
   document.getElementById('crop-apply').addEventListener('click', applyCrop);
@@ -2222,7 +3001,7 @@ function init() {
   document.getElementById('auto-btn').addEventListener('click', applyAuto);
   document.getElementById('undo-btn').addEventListener('click', undo);
   window.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey && !libIsOpen()) {
       e.preventDefault();
       undo();
     }
@@ -2378,6 +3157,12 @@ function init() {
 
   // Initial curve draw
   drawCurve();
+
+  // Show the library straight away when there is something in it
+  ensureLibrary().then(() => {
+    updateDropOverlay();
+    if (lib.photos.length) openLibrary();
+  });
 }
 
 document.addEventListener('DOMContentLoaded', init);
