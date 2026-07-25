@@ -1,0 +1,13 @@
+# Self-contained static page — no build step, no dependencies.
+# Publish the repository root as-is; index.html is the whole app.
+[build]
+  publish = "."
+  command = ""
+
+# The editor decodes photos entirely in the browser and makes no network
+# requests, so nothing needs to be reachable off-origin.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
