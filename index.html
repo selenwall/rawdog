@@ -221,6 +221,72 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
 #drive-setup code{background:var(--panel-2);border-radius:3px;padding:0 3px;font-size:10px;word-break:break-all}
 #drive-setup input{width:100%;padding:7px;border:1px solid var(--border);border-radius:5px;background:var(--plate);color:var(--text);font-size:11px;margin-bottom:10px}
 
+/* ── Photos: album browser over the saved projects ── */
+#photos-view{position:fixed;inset:0;z-index:50;background:var(--bg);display:none;flex-direction:column}
+#photos-view.open{display:flex}
+#pg-top{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--panel)}
+#pg-heading{display:flex;flex-direction:column;gap:1px;min-width:0}
+#pg-title{font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pg-count{font-size:11px;color:var(--text-dim)}
+#pg-top-right{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
+#pg-main{flex:1;min-height:0;display:flex}
+
+#pg-albums{width:196px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:3px;background:var(--panel)}
+.album-row{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--text);border:1px solid transparent}
+.album-row:hover{background:var(--cyan-soft)}
+.album-row.active{background:var(--accent-soft);border-color:var(--accent-deep);color:var(--accent-deep)}
+.album-row.drop-target{border-color:var(--accent-deep);background:var(--accent-soft)}
+.album-row svg{width:14px;height:14px;flex-shrink:0;opacity:.75}
+.album-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.album-count{font-size:10px;color:var(--text-dim);font-variant-numeric:tabular-nums}
+.album-more{background:none;border:none;color:var(--text-dim);cursor:pointer;padding:0 2px;font-size:14px;line-height:1;border-radius:3px;flex-shrink:0}
+.album-more:hover{color:var(--accent-deep)}
+.album-sep{height:1px;background:var(--border);margin:6px 2px}
+#pg-new-album{background:none;border:1px dashed var(--border-strong);color:var(--text-dim);padding:7px 8px;border-radius:6px;font-size:11px;cursor:pointer;text-align:left}
+#pg-new-album:hover{color:var(--accent-deep);border-color:var(--accent-deep)}
+#pg-storage{margin-top:auto;padding:8px 4px 2px;font-size:10px;color:var(--text-dim);line-height:1.5}
+
+#pg-grid-wrap{flex:1;min-width:0;display:flex;flex-direction:column}
+#pg-selbar{display:none;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none;background:var(--panel)}
+#pg-selbar::-webkit-scrollbar{display:none}
+#pg-selbar.visible{display:flex}
+#pg-selcount{font-size:11px;color:var(--text-dim);white-space:nowrap;margin-right:2px}
+.sel-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:5px;font-size:11px;cursor:pointer;white-space:nowrap}
+.sel-btn:hover{background:var(--cyan-soft)}
+.sel-btn.danger:hover{border-color:var(--danger);color:var(--danger)}
+#pg-grid{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(136px,1fr));gap:8px;padding:10px;align-content:start}
+#pg-empty{display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--text-dim);padding:24px;text-align:center}
+#pg-empty.visible{display:flex}
+#pg-empty p{font-size:13px;color:var(--text)}
+#pg-empty small{font-size:11px}
+
+.pg-tile{position:relative;aspect-ratio:1;border-radius:6px;overflow:hidden;background:var(--panel-2);cursor:pointer;border:2px solid transparent;box-shadow:var(--shadow)}
+.pg-tile img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.pg-tile.selected{border-color:var(--accent-deep)}
+.pg-tile.current{border-color:var(--border-strong)}
+.tile-check{position:absolute;top:5px;left:5px;width:20px;height:20px;border-radius:50%;border:1.5px solid var(--plate);background:rgba(58,80,90,.4);display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;color:transparent}
+.pg-tile.selected .tile-check{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.tile-name{position:absolute;left:0;right:0;bottom:0;padding:12px 6px 4px;font-size:10px;color:#fff;background:linear-gradient(transparent,rgba(40,55,62,.85));overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
+.tile-badge{position:absolute;top:5px;right:5px;font-size:9px;font-weight:600;color:var(--on-accent);background:var(--accent);border-radius:3px;padding:1px 4px;pointer-events:none}
+
+#pg-menu{position:fixed;display:none;z-index:65;background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--shadow);min-width:170px;max-height:60vh;overflow-y:auto;padding:5px}
+#pg-menu.open{display:block}
+.menu-item{display:block;width:100%;text-align:left;background:none;border:none;color:var(--text);padding:7px 9px;border-radius:5px;font-size:12px;cursor:pointer}
+.menu-item:hover{background:var(--cyan-soft)}
+.menu-item.danger{color:var(--danger)}
+.menu-head{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);padding:5px 9px 3px}
+.menu-none{font-size:11px;color:var(--text-dim);padding:6px 9px}
+
+@media(max-width:760px){
+  #pg-main{flex-direction:column}
+  #pg-albums{width:100%;flex-direction:row;align-items:center;overflow-x:auto;overflow-y:hidden;border-right:none;border-bottom:1px solid var(--border);padding:8px;gap:5px;scrollbar-width:none}
+  #pg-albums::-webkit-scrollbar{display:none}
+  .album-row{white-space:nowrap;border:1px solid var(--border);border-radius:14px;padding:6px 10px}
+  .album-sep,#pg-storage{display:none}
+  #pg-new-album{white-space:nowrap;border-radius:14px;padding:6px 10px}
+  #pg-grid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px;padding:8px}
+}
+
 /* ── Scrollbar ── */
 #panel-scroll::-webkit-scrollbar{width:4px}
 #panel-scroll::-webkit-scrollbar-track{background:transparent}
@@ -236,15 +302,21 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
     <div id="compare-hint">Hold to compare</div>
     <div id="drop-overlay">
       <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-      <p id="drop-msg">Drop a RAW file here</p>
+      <p id="drop-msg">Drop RAW files here</p>
       <small>Sony ARW · DNG · CR2 · NEF · RAF</small>
-      <button id="open-btn">Open file</button>
-      <input type="file" id="file-input" accept=".arw,.dng,.cr2,.nef,.raf,.ARW,.DNG,.CR2,.NEF,.RAF,image/x-sony-arw,image/x-adobe-dng">
+      <div style="display:flex;gap:8px;pointer-events:all;align-items:center">
+        <button id="open-btn">Open files</button>
+        <button class="tool-btn" id="drop-photos-btn" style="display:none">Photos</button>
+      </div>
+      <input type="file" id="file-input" multiple accept=".arw,.dng,.cr2,.nef,.raf,.ARW,.DNG,.CR2,.NEF,.RAF,image/x-sony-arw,image/x-adobe-dng,image/jpeg,image/png">
     </div>
   </div>
 
   <div id="sidebar">
     <div id="toolbar">
+      <button class="tool-btn icon-btn" id="toolbar-photos-btn" title="Photos &amp; albums" aria-label="Photos and albums">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      </button>
       <button class="tool-btn icon-btn" id="toolbar-open-btn" title="Open file" aria-label="Open file">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
       </button>
@@ -397,6 +469,41 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
     </div>
   </div>
 </div>
+
+<!-- ── Photos: album browser over the saved projects ── -->
+<div id="photos-view">
+  <div id="pg-top">
+    <div id="pg-heading">
+      <span id="pg-title">All Photos</span>
+      <span id="pg-count">No photos yet</span>
+    </div>
+    <div id="pg-top-right">
+      <button class="lib-btn primary" id="pg-import" style="flex:0 0 auto">+ Import</button>
+      <button class="lib-btn" id="pg-close" style="flex:0 0 auto;display:none">Back to photo</button>
+    </div>
+  </div>
+  <div id="pg-main">
+    <div id="pg-albums"></div>
+    <div id="pg-grid-wrap">
+      <div id="pg-selbar">
+        <span id="pg-selcount">0 selected</span>
+        <button class="sel-btn" id="pg-sel-add">Add to album…</button>
+        <button class="sel-btn" id="pg-sel-remove" style="display:none">Remove from album</button>
+        <button class="sel-btn danger" id="pg-sel-delete">Delete</button>
+        <button class="sel-btn" id="pg-sel-clear">Cancel</button>
+      </div>
+      <div id="pg-grid"></div>
+      <div id="pg-empty">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".45"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="9" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        <p id="pg-empty-msg">No photos yet</p>
+        <small>Import RAW files to build your library</small>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="pg-input" multiple style="display:none" accept=".arw,.dng,.cr2,.nef,.raf,.ARW,.DNG,.CR2,.NEF,.RAF,image/x-sony-arw,image/x-adobe-dng,image/jpeg,image/png">
+</div>
+
+<div id="pg-menu"></div>
 
 <div id="toast"><span id="toast-msg"></span><button id="toast-action" style="display:none"></button></div>
 
@@ -2315,7 +2422,7 @@ function applyEditDoc(doc) {
 }
 
 // ── Device storage (IndexedDB) ──────────────────────────────────────────────
-const DB_NAME = 'safelight', DB_STORE = 'projects', DB_VERSION = 1;
+const DB_NAME = 'safelight', DB_STORE = 'projects', DB_ALBUMS = 'albums', DB_VERSION = 2;
 const PROJECTS_KEPT = 30;
 let dbPromise = null;
 
@@ -2325,7 +2432,8 @@ function idb() {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
-      if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE, {keyPath:'id'});
+      if (!db.objectStoreNames.contains(DB_STORE))  db.createObjectStore(DB_STORE,  {keyPath:'id'});
+      if (!db.objectStoreNames.contains(DB_ALBUMS)) db.createObjectStore(DB_ALBUMS, {keyPath:'id'});
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -2333,10 +2441,10 @@ function idb() {
   return dbPromise;
 }
 
-function idbRun(mode, fn) {
+function idbRun(mode, fn, store = DB_STORE) {
   return idb().then(db => new Promise((resolve, reject) => {
-    const tx = db.transaction(DB_STORE, mode);
-    const req = fn(tx.objectStore(DB_STORE));
+    const tx = db.transaction(store, mode);
+    const req = fn(tx.objectStore(store));
     tx.onerror = () => reject(tx.error);
     if (req) { req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); }
     else tx.oncomplete = () => resolve();
@@ -2348,16 +2456,24 @@ const idbAll = ()  => idbRun('readonly',  s => s.getAll());
 const idbDel = id  => idbRun('readwrite', s => s.delete(id));
 const idbPut = rec => idbRun('readwrite', s => s.put(rec));
 
-// small JPEG of the current render, for the saved-edits list
+const idbAlbums   = ()  => idbRun('readonly',  s => s.getAll(), DB_ALBUMS);
+const idbAlbumPut = rec => idbRun('readwrite', s => s.put(rec),  DB_ALBUMS);
+const idbAlbumDel = id  => idbRun('readwrite', s => s.delete(id), DB_ALBUMS);
+
+// small JPEG of a render, for the saved-edits list and the photo grid
+const THUMB_MAX = 320;
+function thumbFrom(src, w, h) {
+  const s = Math.min(THUMB_MAX / w, THUMB_MAX / h, 1);
+  const c = document.createElement('canvas');
+  c.width  = Math.max(1, Math.round(w * s));
+  c.height = Math.max(1, Math.round(h * s));
+  c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+  try { return c.toDataURL('image/jpeg', 0.7); } catch(e) { return null; }
+}
+
 function makeThumb() {
   if (!cropCanvas) return null;
-  const max = 96;
-  const s = Math.min(max / cropCanvas.width, max / cropCanvas.height, 1);
-  const c = document.createElement('canvas');
-  c.width  = Math.max(1, Math.round(cropCanvas.width  * s));
-  c.height = Math.max(1, Math.round(cropCanvas.height * s));
-  c.getContext('2d').drawImage(cropCanvas, 0, 0, c.width, c.height);
-  try { return c.toDataURL('image/jpeg', 0.7); } catch(e) { return null; }
+  return thumbFrom(cropCanvas, cropCanvas.width, cropCanvas.height);
 }
 
 async function saveToDevice(quiet) {
@@ -2373,11 +2489,13 @@ async function saveToDevice(quiet) {
       preview: sourceBlob || null,
       thumb: makeThumb(),
       driveFileId: currentProject.driveFileId || prev?.driveFileId || null,
+      albums: prev?.albums || [],
     });
     await pruneProjects();
     lastSavedAt = Date.now();
     refreshLibraryStatus();
     renderLibraryList();
+    if (photosIsOpen()) renderPhotos();
     if (!quiet) toast('Saved on this device');
     return true;
   } catch(err) {
@@ -2388,11 +2506,14 @@ async function saveToDevice(quiet) {
   }
 }
 
+// Trims the automatic backlog. Anything filed in an album was kept on purpose,
+// so it is never pruned — only the user deletes those.
 async function pruneProjects() {
   const all = await idbAll();
-  if (all.length <= PROJECTS_KEPT) return;
-  all.sort((a,b) => b.savedAt - a.savedAt);
-  for (const rec of all.slice(PROJECTS_KEPT)) await idbDel(rec.id);
+  const loose = all.filter(r => !(r.albums || []).length);
+  if (loose.length <= PROJECTS_KEPT) return;
+  loose.sort((a,b) => b.savedAt - a.savedAt);
+  for (const rec of loose.slice(PROJECTS_KEPT)) await idbDel(rec.id);
 }
 
 let autosaveTimer = null, lastSavedAt = 0;
@@ -2412,7 +2533,7 @@ async function openProject(id) {
     beginSession(img, rec.preview, rec.doc.source);
     currentProject.driveFileId = rec.driveFileId || null;
     applyEditDoc(rec.doc);
-    toast(`Continuing ${rec.name}`);
+    toast((rec.doc.history || []).length ? `Continuing ${rec.name}` : rec.name);
   } else {
     pendingDoc = rec.doc;
     toast(`Open ${rec.doc.source.name} to continue`, 'Open', () => document.getElementById('file-input').click());
@@ -2704,6 +2825,484 @@ async function renderLibraryList() {
   }
 }
 
+// ── Photos & albums ─────────────────────────────────────────────────────────
+// A browsing layer over the same saved projects the panel above manages:
+// importing several files at once creates a project each, and albums are a
+// grouping stored alongside them.
+const pg = {
+  photos: [],          // project records, newest first
+  albums: [],          // {id, name, created}
+  album: 'all',        // album currently shown, or 'all'
+  selection: new Set(),
+};
+let pgDragIds = [];
+
+function photosIsOpen() { return document.getElementById('photos-view').classList.contains('open'); }
+function albumId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+async function loadPhotos() {
+  try {
+    const [photos, albums] = await Promise.all([idbAll(), idbAlbums()]);
+    pg.photos = photos.sort((a,b) => b.savedAt - a.savedAt);
+    pg.albums = albums.sort((a,b) => a.created - b.created);
+  } catch(err) {
+    pg.photos = []; pg.albums = [];
+  }
+}
+
+// an untouched edit doc, for a photo that has been imported but not opened yet
+function blankDoc(meta) {
+  const edit = {params:{}, curvePoints:[{x:0,y:0},{x:1,y:1}], splitShadow:[0,0,0],
+                splitHigh:[0,0,0], straighten:0, rotation:0, flipH:false, flipV:false, geomOps:[]};
+  for (const k of PARAMS) edit.params[k] = 0;
+  return {format: DOC_FORMAT, version: DOC_VERSION, savedAt: new Date().toISOString(),
+          source: meta, edit, history: []};
+}
+
+// Decode a file far enough to store it, without disturbing the open session.
+async function decodeForImport(file) {
+  try {
+    const buf = await file.arrayBuffer();
+    const candidates = extractJPEGs(buf);
+    return await loadBestJPEG(candidates.length ? candidates : [buf]);
+  } catch(err) {
+    return {img: await blobToImage(file), blob: file};
+  }
+}
+
+function setImportStatus(text, isError) {
+  if (photosIsOpen()) {
+    const el = document.getElementById('pg-count');
+    el.textContent = text;
+    el.style.color = isError ? 'var(--danger)' : '';
+  } else {
+    const msg = document.getElementById('drop-msg');
+    msg.style.color = isError ? 'var(--danger)' : '';
+    msg.textContent = text || 'Drop RAW files here';
+    if (text) document.getElementById('drop-overlay').classList.remove('hidden');
+  }
+}
+
+// Stores each file as a project. Files already in the library keep their edits
+// and are just filed into the current album.
+async function importFiles(files) {
+  const list = [...files].filter(f => f && f.size > 0);
+  if (!list.length) return [];
+  const album = pg.album === 'all' ? null : pg.album;
+  const ids = [], failed = [];
+  let quota = false;
+
+  for (let i = 0; i < list.length; i++) {
+    const f = list[i];
+    setImportStatus(list.length > 1 ? `Importing ${i+1} of ${list.length}… ${f.name}` : 'Loading…');
+    const meta = {name: f.name, size: f.size, lastModified: f.lastModified};
+    const id = projectId(meta);
+    try {
+      const prev = await idbGet(id).catch(() => null);
+      if (prev) {
+        prev.albums = prev.albums || [];
+        if (album && !prev.albums.includes(album)) { prev.albums.push(album); await idbPut(prev); }
+      } else {
+        const {img, blob} = await decodeForImport(f);
+        await idbPut({
+          id, name: f.name, savedAt: Date.now(), edits: 0,
+          doc: blankDoc(meta), preview: blob || null,
+          thumb: thumbFrom(img, img.naturalWidth, img.naturalHeight),
+          driveFileId: null, albums: album ? [album] : [],
+        });
+      }
+      ids.push(id);
+    } catch(err) {
+      if (err && /quota/i.test(err.name || '')) { quota = true; break; }
+      failed.push(f.name);
+      console.warn('Import failed:', f.name, err);
+    }
+  }
+
+  await loadPhotos();
+  if (photosIsOpen()) renderPhotos();
+  renderLibraryList();
+  updateDropOverlay();
+
+  if (quota)                   setImportStatus('Device storage is full — delete some photos and try again', true);
+  else if (failed.length === list.length) setImportStatus(`Could not read ${failed[0]}`, true);
+  else if (failed.length)      setImportStatus(`${failed.length} file${failed.length>1?'s':''} could not be read`, true);
+  else                         setImportStatus('');
+  return ids;
+}
+
+// ── Album operations ──
+function albumRec(id) { return pg.albums.find(a => a.id === id) || null; }
+function albumMembers() {
+  return pg.album === 'all' ? pg.photos
+                            : pg.photos.filter(p => (p.albums || []).includes(pg.album));
+}
+function albumCount(id) { return pg.photos.filter(p => (p.albums || []).includes(id)).length; }
+
+async function createAlbum() {
+  const name = (prompt('Album name') || '').trim();
+  if (!name) return null;
+  const album = {id: albumId(), name, created: Date.now()};
+  try { await idbAlbumPut(album); } catch(err) { toast('Could not create the album'); return null; }
+  pg.albums.push(album);
+  pg.album = album.id;
+  pg.selection.clear();
+  renderPhotos();
+  return album;
+}
+
+async function renameAlbum(id) {
+  const album = albumRec(id);
+  if (!album) return;
+  const name = (prompt('Rename album', album.name) || '').trim();
+  if (!name) return;
+  album.name = name;
+  await idbAlbumPut(album);
+  renderPhotos();
+}
+
+async function deleteAlbum(id) {
+  const album = albumRec(id);
+  if (!album) return;
+  if (!confirm(`Delete the album “${album.name}”? The photos stay in your library.`)) return;
+  for (const p of pg.photos.filter(p => (p.albums || []).includes(id))) {
+    p.albums = p.albums.filter(a => a !== id);
+    await idbPut(p);
+  }
+  pg.albums = pg.albums.filter(a => a.id !== id);
+  await idbAlbumDel(id);
+  if (pg.album === id) pg.album = 'all';
+  pg.selection.clear();
+  renderPhotos();
+}
+
+async function addToAlbum(ids, album) {
+  for (const id of ids) {
+    const p = pg.photos.find(x => x.id === id);
+    if (!p) continue;
+    p.albums = p.albums || [];
+    if (!p.albums.includes(album)) { p.albums.push(album); await idbPut(p); }
+  }
+  pg.selection.clear();
+  renderPhotos();
+}
+
+async function removeFromAlbum(ids, album) {
+  for (const id of ids) {
+    const p = pg.photos.find(x => x.id === id);
+    if (!p || !p.albums) continue;
+    p.albums = p.albums.filter(a => a !== album);
+    await idbPut(p);
+  }
+  pg.selection.clear();
+  renderPhotos();
+}
+
+async function deletePhotos(ids) {
+  const n = ids.length;
+  if (!confirm(`Delete ${n} photo${n>1?'s':''} from the library? This cannot be undone.`)) return;
+  for (const id of ids) await idbDel(id);
+  pg.photos = pg.photos.filter(p => !ids.includes(p.id));
+  pg.selection.clear();
+  renderPhotos();
+  renderLibraryList();
+  updateDropOverlay();
+}
+
+// ── Rendering ──
+function updatePhotosHeader() {
+  const album = pg.album === 'all' ? null : albumRec(pg.album);
+  const list  = albumMembers();
+  document.getElementById('pg-title').textContent = album ? album.name : 'All Photos';
+  const count = document.getElementById('pg-count');
+  count.style.color = '';
+  count.textContent = list.length ? `${list.length} photo${list.length===1?'':'s'}`
+                                  : (album ? 'Empty album' : 'No photos yet');
+  document.getElementById('pg-close').style.display = sourceImg ? '' : 'none';
+}
+
+const ICON_GRID = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>';
+const ICON_ALBUM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+
+function renderAlbumRail() {
+  const wrap = document.getElementById('pg-albums');
+  wrap.innerHTML = '';
+
+  const addRow = (id, name, count, isUser) => {
+    const row = document.createElement('div');
+    row.className = 'album-row' + (pg.album === id ? ' active' : '');
+    row.innerHTML = isUser ? ICON_ALBUM : ICON_GRID;
+    const label = document.createElement('span');
+    label.className = 'album-name';
+    label.textContent = name;
+    row.appendChild(label);
+    const cnt = document.createElement('span');
+    cnt.className = 'album-count';
+    cnt.textContent = count;
+    row.appendChild(cnt);
+    if (isUser) {
+      const more = document.createElement('button');
+      more.className = 'album-more';
+      more.textContent = '⋯';
+      more.title = 'Album options';
+      more.addEventListener('click', e => {
+        e.stopPropagation();
+        openPgMenu(more, [
+          {label:'Rename…', onClick:() => renameAlbum(id)},
+          {label:'Delete album', danger:true, onClick:() => deleteAlbum(id)},
+        ]);
+      });
+      row.appendChild(more);
+    }
+    row.addEventListener('click', () => {
+      pg.album = id;
+      pg.selection.clear();
+      renderPhotos();
+    });
+    row.addEventListener('dragover', e => {
+      if (!pgDragIds.length || !isUser) return;
+      e.preventDefault();
+      row.classList.add('drop-target');
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drop-target'));
+    row.addEventListener('drop', e => {
+      row.classList.remove('drop-target');
+      if (!pgDragIds.length || !isUser) return;
+      e.preventDefault();
+      addToAlbum(pgDragIds.slice(), id);
+    });
+    wrap.appendChild(row);
+  };
+
+  addRow('all', 'All Photos', pg.photos.length, false);
+  const sep = document.createElement('div');
+  sep.className = 'album-sep';
+  wrap.appendChild(sep);
+  for (const a of pg.albums) addRow(a.id, a.name, albumCount(a.id), true);
+
+  const add = document.createElement('button');
+  add.id = 'pg-new-album';
+  add.textContent = '+ New album';
+  add.addEventListener('click', createAlbum);
+  wrap.appendChild(add);
+
+  const storage = document.createElement('div');
+  storage.id = 'pg-storage';
+  wrap.appendChild(storage);
+  updateStorageInfo();
+}
+
+function renderPhotoGrid() {
+  const grid = document.getElementById('pg-grid');
+  grid.innerHTML = '';
+  const list = albumMembers();
+
+  document.getElementById('pg-empty').classList.toggle('visible', list.length === 0);
+  grid.style.display = list.length ? '' : 'none';
+  if (!list.length) {
+    document.getElementById('pg-empty-msg').textContent =
+      pg.album === 'all' ? 'No photos yet' : 'This album is empty';
+    return;
+  }
+
+  for (const p of list) {
+    const tile = document.createElement('div');
+    tile.className = 'pg-tile'
+      + (pg.selection.has(p.id) ? ' selected' : '')
+      + (currentProject && currentProject.id === p.id ? ' current' : '');
+    tile.draggable = true;
+    tile.title = p.name;
+    tile.dataset.id = p.id;
+
+    if (p.thumb) {
+      const im = document.createElement('img');
+      im.src = p.thumb;
+      im.alt = p.name;
+      im.loading = 'lazy';
+      tile.appendChild(im);
+    }
+
+    const check = document.createElement('div');
+    check.className = 'tile-check';
+    check.textContent = '✓';
+    check.title = 'Select';
+    check.addEventListener('click', e => { e.stopPropagation(); togglePhoto(p.id); });
+    tile.appendChild(check);
+
+    if ((p.doc && (p.doc.history || []).length) || p.edits) {
+      const badge = document.createElement('div');
+      badge.className = 'tile-badge';
+      badge.textContent = 'Edited';
+      tile.appendChild(badge);
+    }
+
+    const name = document.createElement('div');
+    name.className = 'tile-name';
+    name.textContent = p.name;
+    tile.appendChild(name);
+
+    tile.addEventListener('click', () => {
+      if (pg.selection.size) togglePhoto(p.id);   // in selection mode, tap toggles
+      else openFromPhotos(p.id);
+    });
+    tile.addEventListener('dragstart', e => {
+      pgDragIds = pg.selection.has(p.id) ? [...pg.selection] : [p.id];
+      e.dataTransfer.effectAllowed = 'copy';
+      e.dataTransfer.setData('text/plain', pgDragIds.join(','));
+    });
+    tile.addEventListener('dragend', () => { pgDragIds = []; });
+    grid.appendChild(tile);
+  }
+}
+
+function renderPhotos() {
+  renderAlbumRail();
+  renderPhotoGrid();
+  renderPgSelBar();
+  updatePhotosHeader();
+}
+
+async function updateStorageInfo() {
+  const el = document.getElementById('pg-storage');
+  if (!el) return;
+  const n = pg.photos.length;
+  let txt = `${n} photo${n===1?'':'s'} stored`;
+  if (navigator.storage && navigator.storage.estimate) {
+    try {
+      const {usage} = await navigator.storage.estimate();
+      if (usage) txt += ' · ' + (usage < 1048576 ? Math.round(usage/1024) + ' KB'
+                     : usage < 1073741824 ? (usage/1048576).toFixed(1) + ' MB'
+                     : (usage/1073741824).toFixed(2) + ' GB');
+    } catch(err) { /* estimate is optional */ }
+  }
+  el.textContent = txt;
+}
+
+// ── Selection ── (tiles are patched in place so thumbnails don't reload)
+function togglePhoto(id) {
+  if (pg.selection.has(id)) pg.selection.delete(id);
+  else pg.selection.add(id);
+  const tile = document.querySelector('.pg-tile[data-id="' + CSS.escape(id) + '"]');
+  if (tile) tile.classList.toggle('selected', pg.selection.has(id));
+  renderPgSelBar();
+}
+
+function clearPgSelection() {
+  pg.selection.clear();
+  document.querySelectorAll('.pg-tile.selected').forEach(t => t.classList.remove('selected'));
+  renderPgSelBar();
+}
+
+function renderPgSelBar() {
+  const n = pg.selection.size;
+  document.getElementById('pg-selbar').classList.toggle('visible', n > 0);
+  document.getElementById('pg-selcount').textContent = `${n} selected`;
+  document.getElementById('pg-sel-remove').style.display = pg.album === 'all' ? 'none' : '';
+}
+
+// ── Popup menu ──
+function openPgMenu(anchor, items) {
+  const menu = document.getElementById('pg-menu');
+  menu.innerHTML = '';
+  for (const it of items) {
+    if (it.head || it.none) {
+      const d = document.createElement('div');
+      d.className = it.head ? 'menu-head' : 'menu-none';
+      d.textContent = it.label;
+      menu.appendChild(d);
+      continue;
+    }
+    const b = document.createElement('button');
+    b.className = 'menu-item' + (it.danger ? ' danger' : '');
+    b.textContent = it.label;
+    b.addEventListener('click', e => { e.stopPropagation(); closePgMenu(); it.onClick(); });
+    menu.appendChild(b);
+  }
+  menu.classList.add('open');
+  const r = anchor.getBoundingClientRect();
+  const mw = menu.offsetWidth, mh = menu.offsetHeight;
+  menu.style.left = Math.min(window.innerWidth - mw - 8, Math.max(8, r.left)) + 'px';
+  menu.style.top  = (r.bottom + 4 + mh > window.innerHeight ? Math.max(8, r.top - 4 - mh) : r.bottom + 4) + 'px';
+}
+
+function closePgMenu() { document.getElementById('pg-menu').classList.remove('open'); }
+
+// ── Open / close ──
+async function openPhotos() {
+  if (sourceImg && currentProject) await saveToDevice(true); // don't lose in-flight edits
+  await loadPhotos();
+  document.getElementById('photos-view').classList.add('open');
+  renderPhotos();
+}
+
+function closePhotos() {
+  document.getElementById('photos-view').classList.remove('open');
+  closePgMenu();
+  pg.selection.clear();
+}
+
+async function openFromPhotos(id) {
+  closePhotos();
+  await openProject(id);
+}
+
+function updateDropOverlay() {
+  const btn = document.getElementById('drop-photos-btn');
+  if (btn) btn.style.display = pg.photos.length ? '' : 'none';
+}
+
+// Dropped or picked files: one goes straight to the editor, several land in the
+// library. While the browser is open, everything imports into the current album.
+async function handleIncomingFiles(files) {
+  const list = [...files];
+  if (!list.length) return;
+  if (photosIsOpen()) { await importFiles(list); return; }
+  if (list.length === 1) { await loadFile(list[0]); return; }
+  await importFiles(list);
+  await openPhotos();
+}
+
+function wirePhotos() {
+  const pick = document.getElementById('pg-input');
+  document.getElementById('pg-import').addEventListener('click', () => pick.click());
+  pick.addEventListener('change', e => {
+    if (e.target.files.length) importFiles(e.target.files);
+    e.target.value = '';
+  });
+  document.getElementById('toolbar-photos-btn').addEventListener('click', openPhotos);
+  document.getElementById('drop-photos-btn').addEventListener('click', openPhotos);
+  document.getElementById('pg-close').addEventListener('click', closePhotos);
+
+  document.getElementById('pg-sel-clear').addEventListener('click', clearPgSelection);
+  document.getElementById('pg-sel-delete').addEventListener('click', () => deletePhotos([...pg.selection]));
+  document.getElementById('pg-sel-remove').addEventListener('click', () => {
+    if (pg.album !== 'all') removeFromAlbum([...pg.selection], pg.album);
+  });
+  document.getElementById('pg-sel-add').addEventListener('click', e => {
+    e.stopPropagation();
+    const ids = [...pg.selection];
+    const items = [{label:'Add to album', head:true}];
+    if (!pg.albums.length) items.push({label:'No albums yet', none:true});
+    for (const a of pg.albums) items.push({label:a.name, onClick:() => addToAlbum(ids, a.id)});
+    items.push({label:'+ New album…', onClick: async () => {
+      const album = await createAlbum();
+      if (album) addToAlbum(ids, album.id);
+    }});
+    openPgMenu(e.currentTarget, items);
+  });
+
+  document.addEventListener('click', closePgMenu);
+  document.getElementById('pg-menu').addEventListener('click', e => e.stopPropagation());
+  window.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    closePgMenu();
+    if (photosIsOpen()) {
+      if (pg.selection.size) clearPgSelection();
+      else if (sourceImg) closePhotos();
+    }
+  });
+}
+
 // ── Toast ───────────────────────────────────────────────────────────────────
 let toastTimer = null;
 function toast(msg, actionLabel, onAction, ms = 6000) {
@@ -2899,19 +3498,25 @@ function endCompare(saved) {
 function init() {
   wireSliders();
   wireTabs();
+  wirePhotos();
 
-  // Drag & drop — anywhere on the page
-  window.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
-  window.addEventListener('drop', e => {
+  // Drag & drop — anywhere on the page (files only; photo tiles drag internally)
+  window.addEventListener('dragover', e => {
+    if (!e.dataTransfer.types || !e.dataTransfer.types.includes('Files')) return;
     e.preventDefault();
-    const f = e.dataTransfer.files && e.dataTransfer.files[0];
-    if (f) loadFile(f);
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  window.addEventListener('drop', e => {
+    const files = e.dataTransfer.files;
+    if (!files || !files.length) return;
+    e.preventDefault();
+    handleIncomingFiles(files);
   });
   const openPicker = () => document.getElementById('file-input').click();
   document.getElementById('open-btn').addEventListener('click', openPicker);
   document.getElementById('toolbar-open-btn').addEventListener('click', openPicker);
   document.getElementById('file-input').addEventListener('change', e => {
-    if (e.target.files[0]) loadFile(e.target.files[0]);
+    if (e.target.files.length) handleIncomingFiles(e.target.files);
     e.target.value = ''; // allow re-selecting the same file
   });
 
@@ -3230,6 +3835,12 @@ function init() {
 
   // Initial curve draw
   drawCurve();
+
+  // Open the photo browser straight away when the library has something in it
+  loadPhotos().then(() => {
+    updateDropOverlay();
+    if (pg.photos.length) openPhotos();
+  });
 }
 
 document.addEventListener('DOMContentLoaded', init);
