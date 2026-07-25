@@ -2104,9 +2104,6 @@ async function loadFile(file) {
       return;
     }
   }
-  msg.textContent = 'Drop a RAW file here';
-  overlay.classList.add('hidden');
-
   beginSession(img, blob, {
     name: file.name, size: file.size, lastModified: file.lastModified,
   });
@@ -2125,6 +2122,13 @@ async function loadFile(file) {
 // shared setup for a freshly decoded photo, whether it came from a picked file
 // or from the preview stored inside a saved project
 function beginSession(img, blob, meta) {
+  // every entry point lands here, so the drop overlay is dismissed here too —
+  // a saved project reopened on a fresh page has no picked file to do it
+  const msg = document.getElementById('drop-msg');
+  msg.style.color = '';
+  msg.textContent = 'Drop a RAW file here';
+  document.getElementById('drop-overlay').classList.add('hidden');
+
   sourceImg = img;
   sourceBlob = blob || null;
   sourceMeta = meta || {name:'photo'};
