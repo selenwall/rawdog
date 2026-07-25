@@ -1805,33 +1805,104 @@ function computeAuto() {
     satSum += mx > 0 ? (mx - Math.min(r, g, b)) / mx : 0;
   }
   rs /= n; gs /= n; bs /= n;
-  lumas.sort();
-  const med = lumas[n >> 1];
-  const p1  = lumas[Math.floor(n * 0.01)];
-  const p99 = lumas[Math.floor(n * 0.99)];
+  // percentiles come off a sorted copy — lumas stays per-pixel for the passes below
+  const sorted = Float32Array.from(lumas).sort();
+  const q = f => sorted[Math.min(n - 1, Math.floor(n * f))];
+  const med = sorted[n >> 1];
+  const p1  = q(0.01);
+  const p5  = q(0.05);
+  const p95 = q(0.95);
+  const p99 = q(0.99);
   const avgSat = satSum / n;
 
-  // gray world: pick temp/tint that equalize the shader's channel gains
-  // shader: r*=1+t*.3, b*=1-t*.3 → solve rs*(1+t*.3) = bs*(1-t*.3)
-  let temp = (bs - rs) / (0.3 * (rs + bs) + 1e-6) * 100;
-  const m = (rs + bs) / 2;
-  let tint = (m - gs) / (0.15 * gs + 0.08 * m + 1e-6) * 100;
-  temp = Math.round(Math.max(-60, Math.min(60, temp)));
-  tint = Math.round(Math.max(-40, Math.min(40, tint)));
+  // how much of the frame sits at each end — a dark subject on a bright
+  // background is a shadow problem, not an exposure one, and only this tells
+  // the two apart
+  let darkN = 0, brightN = 0, clipN = 0;
+  for (let i = 0; i < n; i++) {
+    const L = lumas[i];
+    if (L < 0.12) darkN++;
+    if (L > 0.92) brightN++;
+    if (L > 0.99) clipN++;
+  }
+  const darkFrac = darkN / n, brightFrac = brightN / n, clipFrac = clipN / n;
 
-  // exposure: bring median luma toward mid-gray (shader applies 2^ev in linear,
-  // which scales gamma-encoded luma by 2^(ev/2.2))
-  let exposure = 2.2 * Math.log2(0.42 / Math.max(0.03, med));
-  exposure = Math.round(Math.max(-1.5, Math.min(1.5, exposure)) * 20) / 20;
+  // White balance. Grey-world assumes the whole frame averages to neutral,
+  // which a scene with a dominant colour breaks: a lake full of foliage reads
+  // as "too green and blue", and grey-world answers by warming everything
+  // until the sky goes pink. Estimate the illuminant from the brightest
+  // unclipped pixels instead — those are usually near-neutral — and keep
+  // grey-world only as the fallback when there are too few of them.
+  const p90 = q(0.90);
+  let wr = 0, wg = 0, wb = 0, wn = 0;
+  for (let i = 0; i < n; i++) {
+    if (lumas[i] < p90) continue;
+    const r = d[i*4]/255, g = d[i*4+1]/255, b = d[i*4+2]/255;
+    if (Math.max(r, g, b) >= 0.98) continue; // clipped: channel ratios are meaningless
+    wr += Math.pow(r, 2.2); wg += Math.pow(g, 2.2); wb += Math.pow(b, 2.2); wn++;
+  }
+  const useWhite = wn > n * 0.01;
+  const er = useWhite ? wr/wn : rs, eg = useWhite ? wg/wn : gs, eb = useWhite ? wb/wn : bs;
+
+  // pick temp/tint that equalize the shader's channel gains
+  // shader: r*=1+t*.3, b*=1-t*.3 → solve er*(1+t*.3) = eb*(1-t*.3)
+  let temp = (eb - er) / (0.3 * (er + eb) + 1e-6) * 100;
+  const m = (er + eb) / 2;
+  let tint = (m - eg) / (0.15 * eg + 0.08 * m + 1e-6) * 100;
+  // damped and tightly clamped: an automatic white balance should be a nudge,
+  // not a colour cast the user then has to dial back out
+  temp = Math.round(Math.max(-35, Math.min(35, temp * 0.7)));
+  tint = Math.round(Math.max(-25, Math.min(25, tint * 0.7)));
+
+  // Exposure (shader applies 2^ev in linear, scaling gamma-encoded luma by
+  // 2^(ev/2.2)). A well-exposed frame's median is not mid-grey — a big sky,
+  // snow, or a dark subject all move it legitimately — so exposure only moves
+  // on positive evidence of being under- or over-exposed, and holds at 0
+  // otherwise. Aiming the median at mid-grey darkened good bright scenes.
+  let exposure = 0;
+  // EV available before the near-whites clip; judged at p95 so that small
+  // speculars don't veto lifting a genuinely dark frame
+  const headroom = 2.2 * Math.log2(0.90 / Math.max(0.45, p95));
+  if (med < 0.34 && headroom > 0.05) {
+    // underexposed: lift the midtones, but never past that headroom
+    exposure = Math.min(2.2 * Math.log2(0.40 / Math.max(0.04, med)), headroom);
+  } else if (p5 > 0.42 && med > 0.70) {
+    // washed out: even the darkest tones sit well off the floor, so the whole
+    // frame really is too bright. Clipping alone is not evidence — clipped
+    // highlights stay clipped when exposure comes down, only darker. A high-key
+    // scene that still holds shadow detail fails this test, as it should.
+    exposure = 2.2 * Math.log2(0.55 / med);
+  }
+  // asymmetric on purpose: darkening a good photo is the more damaging mistake,
+  // and blacks/contrast recover a washed-out frame better than exposure does
+  exposure = Math.round(Math.max(-0.6, Math.min(1.5, exposure)) * 20) / 20;
+
+  // Recover the ends locally instead, which is what a backlit subject or a
+  // bright sky actually needs. The shader's shadow lift is multiplicative
+  // (col += col * shadows * mask), so it barely moves near-black pixels — the
+  // additive blacks control is what actually opens up a dark subject, so a
+  // crushed bottom end lifts both.
+  let shadows = 0, blacks = 0;
+  if (darkFrac > 0.05) {
+    shadows = Math.min(50, Math.round((darkFrac - 0.03) * 220));
+    blacks  = Math.min(30, Math.round((darkFrac - 0.03) * 120));
+  } else if (p1 > 0.05) {
+    blacks  = -Math.min(40, Math.round((p1 - 0.03) * 160)); // no true blacks: deepen
+  }
+
+  // Highlights come down only for a genuinely bright frame, and gently: pixels
+  // that are already clipped hold no detail to recover, so a hard pull just
+  // turns a blown sky into a grey one.
+  const highlights = (brightFrac > 0.15 || clipFrac > 0.03)
+    ? -Math.min(25, Math.round(brightFrac * 25 + clipFrac * 40)) : 0;
 
   // stretch endpoints toward full range, add contrast if flat, vibrance if dull
   const whites   = p99 < 0.90 ? Math.min(50, Math.round((0.95 - p99) * 120)) : 0;
-  const blacks   = p1  > 0.05 ? -Math.min(40, Math.round((p1 - 0.03) * 160)) : 0;
   const spread   = p99 - p1;
   const contrast = spread < 0.75 ? Math.min(25, Math.round((0.8 - spread) * 60)) : 0;
   const vibrance = Math.max(0, Math.min(30, Math.round((0.3 - avgSat) * 100)));
 
-  return {exposure, contrast, whites, blacks, temp, tint, vibrance};
+  return {exposure, contrast, highlights, shadows, whites, blacks, temp, tint, vibrance};
 }
 
 function applyAuto() {
