@@ -3,18 +3,42 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#daf5ff">
 <title>Safelight — RAW Editor</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+/* ── Palette ───────────────────────────────────────────────────────────────
+   616163 grey · 44FFD2 aqua · 87F6FF cyan · DAF5FF ice · FFBFA0 peach
+   The four colour swatches are all high-luminance, so the aqua is used as a
+   FILL (with dark text on top) and --accent-deep carries accent text/strokes
+   on pale surfaces, where 44FFD2 itself would drop to ~1.1:1 contrast.      */
 :root{
-  --bg:#111;--panel:#1a1a1a;--border:#2a2a2a;--accent:#e8a838;
-  --text:#ccc;--text-dim:#666;--slider-h:3px;--thumb:14px;
+  --bg:#daf5ff;            /* ice */
+  --panel:#f2fbff;         /* derived near-white ice */
+  --panel-2:#daf5ff;       /* recessed fill */
+  --border:#a5dce8;
+  --border-strong:#6fbece;
+  --accent:#44ffd2;        /* aqua — fills and active states only */
+  --accent-deep:#0d7d67;   /* derived: accent as text/stroke on pale surfaces */
+  --accent-soft:rgba(68,255,210,.28);
+  --on-accent:#2b4a44;     /* dark text on aqua, 7.6:1 */
+  --cyan:#87f6ff;
+  --cyan-soft:rgba(135,246,255,.45);   /* cyan at hover strength */
+  --peach:#ffbfa0;
+  --on-peach:#5a3524;      /* dark warm text on peach, 6.7:1 */
+  --text:#616163;          /* grey, 5.4:1 on ice */
+  --text-dim:#676769;      /* 5.0:1 on ice */
+  --canvas-bg:#dfe7eb;     /* desaturated: a strong tint here biases white-balance judgement */
+  --plate:#f2fbff;
+  --danger:#c0442a;
+  --shadow:0 4px 16px rgba(58,80,90,.18);
+  --slider-h:3px;--thumb:14px;
 }
 html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 system-ui,sans-serif;overflow:hidden}
 
 /* ── Layout: image on top (always visible), control sheet below ── */
 #app{display:flex;flex-direction:column;height:100vh;height:100dvh}
-#canvas-area{flex:1;min-height:0;position:relative;overflow:hidden;background:#0a0a0a;display:flex;align-items:center;justify-content:center;touch-action:none}
+#canvas-area{flex:1;min-height:0;position:relative;overflow:hidden;background:var(--canvas-bg);display:flex;align-items:center;justify-content:center;touch-action:none}
 #main-canvas{display:block;max-width:100%;max-height:100%;object-fit:contain;cursor:crosshair}
 #sidebar{flex-shrink:0;display:flex;flex-direction:column;max-height:48vh;background:var(--panel);border-top:1px solid var(--border)}
 #panel-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:env(safe-area-inset-bottom)}
@@ -31,41 +55,45 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
   #sidebar{width:min(340px,46vw);min-width:250px;max-height:none;height:100vh;height:100dvh;border-top:none;border-left:1px solid var(--border)}
 }
 @media(max-width:979px){
-  #histogram-canvas{display:none} /* floating histogram covers the photo on small screens */
+  /* floating histogram covers the photo on small screens — beat .ready too */
+  #histogram-canvas,#histogram-canvas.ready{display:none}
 }
 
 /* ── Drop overlay ── */
-#drop-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--text-dim);pointer-events:none;user-select:none;background:rgba(10,10,10,.85)}
+#drop-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--text-dim);pointer-events:none;user-select:none;background:rgba(218,245,255,.9)}
 #drop-overlay.hidden{display:none}
-#drop-overlay svg{opacity:.3}
-#drop-overlay p{font-size:15px}
-#drop-overlay small{font-size:12px;opacity:.5}
+#drop-overlay svg{opacity:.45}
+#drop-overlay p{font-size:15px;color:var(--text)}
+#drop-overlay small{font-size:12px;color:var(--text-dim)}
 #file-input{display:none}
-#open-btn{pointer-events:all;padding:8px 20px;background:var(--accent);color:#000;border:none;border-radius:4px;font:600 13px system-ui,sans-serif;cursor:pointer;margin-top:4px}
+#open-btn{pointer-events:all;padding:8px 20px;background:var(--accent);color:var(--on-accent);border:none;border-radius:4px;font:600 13px system-ui,sans-serif;cursor:pointer;margin-top:4px}
+#open-btn:hover{background:#2ae9bc}
 
 /* ── Canvas overlays ── */
 #crop-overlay{position:absolute;inset:0;pointer-events:none;display:none}
-#histogram-canvas{position:absolute;bottom:8px;left:8px;width:160px;height:80px;opacity:.8;border-radius:4px;pointer-events:none}
-#compare-hint{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:3px 8px;border-radius:3px;display:none;pointer-events:none}
+/* stays hidden until it has data — an empty canvas would render as a bare plate */
+#histogram-canvas{position:absolute;bottom:8px;left:8px;width:160px;height:80px;opacity:.92;border-radius:4px;pointer-events:none;box-shadow:var(--shadow);display:none}
+#histogram-canvas.ready{display:block}
+#compare-hint{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:var(--plate);color:var(--text);font-size:11px;padding:3px 8px;border-radius:3px;display:none;pointer-events:none;box-shadow:var(--shadow)}
 
 /* ── Toolbar ── */
 #toolbar{display:flex;align-items:center;gap:3px;padding:8px 6px;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none}
 #toolbar::-webkit-scrollbar{display:none}
 .tool-btn{display:flex;align-items:center;gap:4px;background:none;border:1px solid var(--border);color:var(--text);padding:7px 9px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;transition:background .15s}
-.tool-btn:hover{background:var(--border)}
-.tool-btn.active{border-color:var(--accent);color:var(--accent)}
+.tool-btn:hover{background:var(--cyan-soft)}
+.tool-btn.active{border-color:var(--accent-deep);color:var(--accent-deep);background:var(--accent-soft)}
 .tool-btn svg{width:15px;height:15px;flex-shrink:0}
 .icon-btn{padding:7px 8px}
 #toolbar-right{margin-left:auto;display:flex;gap:4px}
-#export-btn{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}
-#export-btn:hover{background:#d4922e}
+#export-btn{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:600}
+#export-btn:hover{background:#2ae9bc;border-color:#2ae9bc}
 
 /* ── Section tabs (one tool group visible at a time) ── */
 #section-tabs{display:flex;gap:4px;padding:8px 10px 0;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
 #section-tabs::-webkit-scrollbar{display:none}
 .sec-tab{background:none;border:1px solid var(--border);color:var(--text-dim);padding:5px 8px;border-radius:14px;font-size:11px;cursor:pointer;white-space:nowrap}
-.sec-tab:hover{color:var(--text)}
-.sec-tab.active{border-color:var(--accent);color:var(--accent)}
+.sec-tab:hover{color:var(--text);background:var(--cyan-soft)}
+.sec-tab.active{border-color:var(--accent);color:var(--on-accent);background:var(--accent)}
 .panel-page{display:none;padding:12px 12px 14px}
 .panel-page.active{display:block}
 
@@ -73,10 +101,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
 .slider-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
 .slider-row label{width:70px;font-size:11px;color:var(--text-dim);flex-shrink:0}
 .slider-row input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:28px;background:transparent;outline:none;cursor:pointer;margin:0;touch-action:pan-y}
-.slider-row input[type=range]::-webkit-slider-runnable-track{height:var(--slider-h);background:var(--border);border-radius:2px}
-.slider-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:var(--thumb);height:var(--thumb);border-radius:50%;background:var(--text);border:1px solid var(--bg);cursor:grab;margin-top:calc((var(--slider-h) - var(--thumb))/2)}
-.slider-row input[type=range]::-moz-range-track{height:var(--slider-h);background:var(--border);border-radius:2px}
-.slider-row input[type=range]::-moz-range-thumb{width:var(--thumb);height:var(--thumb);border-radius:50%;background:var(--text);border:1px solid var(--bg);cursor:grab}
+.slider-row input[type=range]::-webkit-slider-runnable-track{height:var(--slider-h);background:var(--border-strong);border-radius:2px}
+.slider-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:var(--thumb);height:var(--thumb);border-radius:50%;background:var(--accent-deep);border:1px solid var(--panel);cursor:grab;margin-top:calc((var(--slider-h) - var(--thumb))/2)}
+.slider-row input[type=range]::-moz-range-track{height:var(--slider-h);background:var(--border-strong);border-radius:2px}
+.slider-row input[type=range]::-moz-range-thumb{width:var(--thumb);height:var(--thumb);border-radius:50%;background:var(--accent-deep);border:1px solid var(--panel);cursor:grab}
 .slider-val{width:34px;font-size:11px;text-align:right;color:var(--text-dim);font-variant-numeric:tabular-nums}
 
 /* bigger touch targets on touch devices */
@@ -88,42 +116,42 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
 }
 
 /* ── Curve editor ── */
-#curve-canvas{display:block;width:100%;max-width:240px;margin:0 auto;aspect-ratio:1;background:#0d0d0d;border-radius:4px;cursor:crosshair;touch-action:none}
+#curve-canvas{display:block;width:100%;max-width:240px;margin:0 auto;aspect-ratio:1;background:var(--plate);border-radius:4px;cursor:crosshair;touch-action:none}
 
 /* ── Histogram mode ── */
 #hist-mode{display:flex;gap:4px;margin-bottom:6px}
 .hist-btn{background:none;border:1px solid var(--border);color:var(--text-dim);padding:2px 8px;border-radius:3px;font-size:11px;cursor:pointer}
-.hist-btn.active{border-color:var(--accent);color:var(--accent)}
+.hist-btn.active{border-color:var(--accent);color:var(--on-accent);background:var(--accent)}
 
 /* ── Undo & Auto adjust ── */
 #auto-row{padding:8px 10px 0;display:flex;gap:6px}
 #undo-btn{flex:1;padding:7px;background:none;border:1px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;cursor:pointer;transition:background .15s}
-#undo-btn:hover{background:var(--border)}
-#undo-btn.disabled{opacity:.35;pointer-events:none}
-#auto-btn{flex:1.4;padding:7px;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;font-size:12px;cursor:pointer;transition:background .15s}
-#auto-btn:hover{background:rgba(232,168,56,.12)}
+#undo-btn:hover{background:var(--cyan-soft)}
+#undo-btn.disabled{opacity:.4;pointer-events:none}
+#auto-btn{flex:1.4;padding:7px;background:var(--peach);border:1px solid var(--peach);color:var(--on-peach);border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:background .15s}
+#auto-btn:hover{background:#ffa982;border-color:#ffa982}
 
 /* ── History ── */
 .hist-row{padding:8px 10px;font-size:11px;color:var(--text);border-bottom:1px solid var(--border);cursor:pointer;border-radius:3px}
-.hist-row:hover{background:var(--border)}
+.hist-row:hover{background:var(--accent-soft)}
 .hist-empty{font-size:11px;color:var(--text-dim);padding:8px 0}
 
 /* ── Export dialog ── */
-#export-menu{position:fixed;display:none;z-index:50;background:#222;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.5);width:240px;padding:10px}
+#export-menu{position:fixed;display:none;z-index:50;background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--shadow);width:240px;padding:10px}
 #export-menu.open{display:block}
 .exp-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
 .exp-row>span{width:46px;font-size:11px;color:var(--text-dim);flex-shrink:0}
 .exp-btns{display:flex;gap:4px;flex:1}
 .exp-btns button{flex:1;background:none;border:1px solid var(--border);color:var(--text-dim);padding:5px 0;border-radius:4px;font-size:11px;cursor:pointer}
-.exp-btns button.active{border-color:var(--accent);color:var(--accent)}
+.exp-btns button.active{border-color:var(--accent);color:var(--on-accent);background:var(--accent)}
 #exp-quality{flex:1;-webkit-appearance:none;appearance:none;height:20px;background:transparent;cursor:pointer;margin:0;touch-action:pan-y}
-#exp-quality::-webkit-slider-runnable-track{height:3px;background:var(--border);border-radius:2px}
-#exp-quality::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--text);margin-top:-5.5px}
-#exp-quality::-moz-range-track{height:3px;background:var(--border);border-radius:2px}
-#exp-quality::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--text);border:none}
+#exp-quality::-webkit-slider-runnable-track{height:3px;background:var(--border-strong);border-radius:2px}
+#exp-quality::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent-deep);margin-top:-5.5px}
+#exp-quality::-moz-range-track{height:3px;background:var(--border-strong);border-radius:2px}
+#exp-quality::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--accent-deep);border:none}
 #exp-quality-val{width:24px;font-size:11px;text-align:right;color:var(--text-dim)}
-#export-go{width:100%;padding:8px;background:var(--accent);color:#000;border:none;border-radius:5px;font:600 12px system-ui,sans-serif;cursor:pointer}
-#export-go:hover{background:#d4922e}
+#export-go{width:100%;padding:8px;background:var(--accent);color:var(--on-accent);border:none;border-radius:5px;font:600 12px system-ui,sans-serif;cursor:pointer}
+#export-go:hover{background:#2ae9bc}
 
 /* ── Color mixer ── */
 .mixer-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);margin:10px 0 6px}
@@ -133,8 +161,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
 .preset-group-label{grid-column:1/-1;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);margin:6px 0 0}
 .preset-group-label:first-child{margin-top:0}
 .preset-item{cursor:pointer;border-radius:4px;overflow:hidden;border:2px solid transparent;transition:border-color .15s}
-.preset-item:hover{border-color:var(--text-dim)}
-.preset-item.active{border-color:var(--accent)}
+.preset-item:hover{border-color:var(--border-strong)}
+.preset-item.active{border-color:var(--accent-deep)}
 .preset-item canvas{display:block;width:100%;aspect-ratio:1;image-rendering:pixelated}
 .preset-item span{display:block;text-align:center;font-size:10px;padding:2px 0;color:var(--text-dim)}
 
@@ -143,18 +171,19 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
 #crop-controls.visible{display:flex}
 .ratio-btns{display:flex;flex-wrap:wrap;gap:4px}
 .ratio-btn{background:none;border:1px solid var(--border);color:var(--text-dim);padding:3px 8px;border-radius:3px;font-size:11px;cursor:pointer}
-.ratio-btn:hover,.ratio-btn.active{border-color:var(--accent);color:var(--accent)}
+.ratio-btn:hover{border-color:var(--accent-deep);color:var(--accent-deep)}
+.ratio-btn.active{border-color:var(--accent);color:var(--on-accent);background:var(--accent)}
 .crop-action-btns{display:flex;gap:6px}
-.crop-action-btn{flex:1;padding:5px;background:var(--border);border:none;color:var(--text);border-radius:4px;font-size:11px;cursor:pointer}
-.crop-action-btn:hover{background:#333}
-#crop-apply{background:var(--accent);color:#000;font-weight:600}
-#crop-apply:hover{background:#d4922e}
+.crop-action-btn{flex:1;padding:5px;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:11px;cursor:pointer}
+.crop-action-btn:hover{background:var(--cyan-soft)}
+#crop-apply{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+#crop-apply:hover{background:#2ae9bc;border-color:#2ae9bc}
 #crop-reset{background:none;border:1px solid var(--border);color:var(--text-dim)}
 
 /* ── Scrollbar ── */
 #panel-scroll::-webkit-scrollbar{width:4px}
 #panel-scroll::-webkit-scrollbar-track{background:transparent}
-#panel-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+#panel-scroll::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:2px}
 </style>
 </head>
 <body>
@@ -223,12 +252,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
           <div class="slider-row"><label>Vibrance</label><input type="range" id="s-vibrance" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-vibrance">0</span></div>
           <div class="slider-row"><label>Saturation</label><input type="range" id="s-sat" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-sat">0</span></div>
           <div class="mixer-label">Color mixer</div>
-          <div class="slider-row"><label style="color:#e06868">Red</label><input type="range" id="s-mixr" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixr">0</span></div>
-          <div class="slider-row"><label style="color:#d6c04a">Yellow</label><input type="range" id="s-mixy" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixy">0</span></div>
-          <div class="slider-row"><label style="color:#7ec850">Green</label><input type="range" id="s-mixg" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixg">0</span></div>
-          <div class="slider-row"><label style="color:#5bc8c8">Cyan</label><input type="range" id="s-mixc" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixc">0</span></div>
-          <div class="slider-row"><label style="color:#7a99e8">Blue</label><input type="range" id="s-mixb" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixb">0</span></div>
-          <div class="slider-row"><label style="color:#c878c8">Magenta</label><input type="range" id="s-mixm" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixm">0</span></div>
+          <div class="slider-row"><label style="color:#b3352f">Red</label><input type="range" id="s-mixr" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixr">0</span></div>
+          <div class="slider-row"><label style="color:#8a6f14">Yellow</label><input type="range" id="s-mixy" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixy">0</span></div>
+          <div class="slider-row"><label style="color:#3f7a2e">Green</label><input type="range" id="s-mixg" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixg">0</span></div>
+          <div class="slider-row"><label style="color:#1d6f75">Cyan</label><input type="range" id="s-mixc" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixc">0</span></div>
+          <div class="slider-row"><label style="color:#33529e">Blue</label><input type="range" id="s-mixb" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixb">0</span></div>
+          <div class="slider-row"><label style="color:#8f3a86">Magenta</label><input type="range" id="s-mixm" min="-100" max="100" step="1" value="0"><span class="slider-val" id="v-mixm">0</span></div>
         </div>
         <div class="panel-page" id="page-curve">
           <canvas id="curve-canvas" width="220" height="220"></canvas>
@@ -250,7 +279,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
             <button class="hist-btn active" data-hist="rgb">RGB</button>
             <button class="hist-btn" data-hist="luma">Luma</button>
           </div>
-          <canvas id="hist-panel-canvas" width="260" height="100" style="width:100%;background:#0d0d0d;border-radius:4px"></canvas>
+          <canvas id="hist-panel-canvas" width="260" height="100" style="width:100%;background:var(--plate);border:1.5px solid var(--border);border-radius:6px"></canvas>
         </div>
         <div class="panel-page" id="page-history">
           <div id="history-list"><div class="hist-empty">No edits yet</div></div>
@@ -945,11 +974,35 @@ function computeHists(pixels, total) {
   return {r:rHist, g:gHist, b:bHist, l:lHist};
 }
 
+// Colors for canvas-drawn chrome. Canvas can't read CSS custom properties, so
+// these mirror the :root tokens — keep them in sync when the palette changes.
+const UI = {
+  plate:     '#f2fbff',
+  white:     '#ffffff',
+  ink:       '#4f4f51',
+  inkFaint:  'rgba(79,79,81,0.10)',
+  inkSoft:   'rgba(79,79,81,0.20)',
+  inkStrong: 'rgba(79,79,81,0.85)',
+  accent:    '#0d7d67',
+  histR:     'rgba(196,60,48,0.66)',
+  histG:     'rgba(46,140,86,0.66)',
+  histB:     'rgba(52,96,182,0.66)',
+  histL:     'rgba(79,79,81,0.72)',
+  curveLo:   '#aedfec',
+  curveHi:   '#f7fdff',
+  scrim:     'rgba(218,245,255,0.62)',
+};
+
 function drawHistogram(canvas, hists) {
   const ctx = canvas.getContext('2d');
   const cw = canvas.width, ch = canvas.height;
   ctx.clearRect(0,0,cw,ch);
-  if (!hists) return;
+  if (!hists) { canvas.classList.remove('ready'); return; }
+  canvas.classList.add('ready');
+
+  // light plate behind the traces — the floating histogram sits over the photo
+  ctx.fillStyle = UI.plate;
+  ctx.fillRect(0,0,cw,ch);
 
   const bins = 256;
   // log scale
@@ -972,13 +1025,15 @@ function drawHistogram(canvas, hists) {
     ctx.fill();
   }
 
-  ctx.globalCompositeOperation = 'screen';
+  // 'multiply' is the light-theme analog of 'screen': overlapping channels
+  // darken toward neutral instead of blowing out to white.
+  ctx.globalCompositeOperation = 'multiply';
   if (histMode === 'rgb') {
-    drawChan(scaleArr(hists.r), 'rgba(220,60,60,0.7)');
-    drawChan(scaleArr(hists.g), 'rgba(60,180,60,0.7)');
-    drawChan(scaleArr(hists.b), 'rgba(60,100,220,0.7)');
+    drawChan(scaleArr(hists.r), UI.histR);
+    drawChan(scaleArr(hists.g), UI.histG);
+    drawChan(scaleArr(hists.b), UI.histB);
   } else {
-    drawChan(scaleArr(hists.l), 'rgba(200,200,200,0.8)');
+    drawChan(scaleArr(hists.l), UI.histL);
   }
   ctx.globalCompositeOperation = 'source-over';
 }
@@ -998,25 +1053,25 @@ function drawCurve() {
 
   // background gradient
   const grad = ctx.createLinearGradient(0,h,w,0);
-  grad.addColorStop(0,'#111');
-  grad.addColorStop(1,'#444');
+  grad.addColorStop(0,UI.curveLo);
+  grad.addColorStop(1,UI.curveHi);
   ctx.fillStyle=grad; ctx.fillRect(0,0,w,h);
 
   // grid
-  ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=1;
+  ctx.strokeStyle=UI.inkFaint; ctx.lineWidth=1;
   for(let i=1;i<4;i++){
     ctx.beginPath();ctx.moveTo(i*w/4,0);ctx.lineTo(i*w/4,h);ctx.stroke();
     ctx.beginPath();ctx.moveTo(0,i*h/4);ctx.lineTo(w,i*h/4);ctx.stroke();
   }
 
   // diagonal identity
-  ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=1;
+  ctx.strokeStyle=UI.inkSoft; ctx.lineWidth=1;
   ctx.beginPath();ctx.moveTo(0,h);ctx.lineTo(w,0);ctx.stroke();
 
   // curve
   const sorted = state.curvePoints.slice().sort((a,b)=>a.x-b.x);
   const lut = buildCurveLUT(sorted);
-  ctx.strokeStyle='#e8a838'; ctx.lineWidth=2;
+  ctx.strokeStyle=UI.accent; ctx.lineWidth=2.5;
   ctx.beginPath();
   for(let i=0;i<256;i++){
     const x = (i/255)*w;
@@ -1029,9 +1084,9 @@ function drawCurve() {
   state.curvePoints.forEach((p,i)=>{
     const x=p.x*w, y=(1-p.y)*h;
     ctx.beginPath();ctx.arc(x,y,i===curveDragging||i===curveHover?6:4,0,Math.PI*2);
-    ctx.fillStyle= i===curveDragging?'#fff':'#e8a838';
+    ctx.fillStyle= i===curveDragging?UI.ink:UI.accent;
     ctx.fill();
-    ctx.strokeStyle='#000'; ctx.lineWidth=1; ctx.stroke();
+    ctx.strokeStyle=UI.white; ctx.lineWidth=1.5; ctx.stroke();
   });
 }
 
@@ -1170,30 +1225,39 @@ function drawCropOverlay() {
   const cx0 = Math.max(ir.x, x0), cy0 = Math.max(ir.y, y0);
   const cx1 = Math.min(ir.x+ir.w, x1), cy1 = Math.min(ir.y+ir.h, y1);
 
-  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillStyle = UI.scrim;
   ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.clearRect(cx0,cy0,cx1-cx0,cy1-cy0);
 
-  // rule of thirds
-  ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=1;
   const cw=cx1-cx0, ch=cy1-cy0;
-  ctx.beginPath();
-  ctx.moveTo(cx0+cw/3,cy0);ctx.lineTo(cx0+cw/3,cy1);
-  ctx.moveTo(cx0+2*cw/3,cy0);ctx.lineTo(cx0+2*cw/3,cy1);
-  ctx.moveTo(cx0,cy0+ch/3);ctx.lineTo(cx1,cy0+ch/3);
-  ctx.moveTo(cx0,cy0+2*ch/3);ctx.lineTo(cx1,cy0+2*ch/3);
-  ctx.stroke();
 
-  ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=2;
-  ctx.strokeRect(cx0,cy0,cw,ch);
+  // Guides and handles sit over the photo, which can be any brightness, so each
+  // is drawn twice: a light underlay first, the dark line on top. That keeps
+  // them readable against both blown highlights and deep shadows.
+  const thirds = () => {
+    ctx.beginPath();
+    ctx.moveTo(cx0+cw/3,cy0);ctx.lineTo(cx0+cw/3,cy1);
+    ctx.moveTo(cx0+2*cw/3,cy0);ctx.lineTo(cx0+2*cw/3,cy1);
+    ctx.moveTo(cx0,cy0+ch/3);ctx.lineTo(cx1,cy0+ch/3);
+    ctx.moveTo(cx0,cy0+2*ch/3);ctx.lineTo(cx1,cy0+2*ch/3);
+    ctx.stroke();
+  };
+  ctx.strokeStyle='rgba(255,255,255,0.62)'; ctx.lineWidth=2.5; thirds();
+  ctx.strokeStyle='rgba(79,79,81,0.38)';    ctx.lineWidth=1;   thirds();
+
+  ctx.strokeStyle=UI.white;     ctx.lineWidth=4;   ctx.strokeRect(cx0,cy0,cw,ch);
+  ctx.strokeStyle=UI.inkStrong; ctx.lineWidth=1.5; ctx.strokeRect(cx0,cy0,cw,ch);
 
   // handles: corner brackets + edge ticks (drag to adjust)
-  ctx.fillStyle='#fff';
   const HS = 4; // handle half-size
   const corners = [[cx0,cy0],[cx1,cy0],[cx0,cy1],[cx1,cy1]];
-  for (const [hx,hy] of corners) ctx.fillRect(hx-HS-1, hy-HS-1, (HS+1)*2, (HS+1)*2);
   const edges = [[(cx0+cx1)/2,cy0],[(cx0+cx1)/2,cy1],[cx0,(cy0+cy1)/2],[cx1,(cy0+cy1)/2]];
-  for (const [hx,hy] of edges) ctx.fillRect(hx-HS, hy-HS, HS*2, HS*2);
+  const handle = (hx,hy,s) => {
+    ctx.fillStyle=UI.white; ctx.fillRect(hx-s-2, hy-s-2, (s+2)*2, (s+2)*2);
+    ctx.fillStyle=UI.ink;   ctx.fillRect(hx-s,   hy-s,   s*2,     s*2);
+  };
+  for (const [hx,hy] of corners) handle(hx,hy,HS+1);
+  for (const [hx,hy] of edges)   handle(hx,hy,HS);
 }
 
 // keep w/h ratio when resizing from a corner, anchored at the opposite corner
@@ -1859,7 +1923,7 @@ async function loadFile(file) {
         im.src = url;
       });
     } catch(e2) {
-      msg.style.color = '#e55';
+      msg.style.color = 'var(--danger)';
       msg.textContent = `Failed to load: ${err.message}`;
       return;
     }
