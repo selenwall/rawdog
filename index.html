@@ -205,6 +205,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
 .lib-row button.lib-del:hover{border-color:var(--danger);color:var(--danger)}
 .lib-empty{font-size:11px;color:var(--text-dim);padding:6px 0}
 #lib-status{font-size:11px;color:var(--accent-deep)}
+#lib-source{font-size:10px;color:var(--text-dim);line-height:1.5}
+#lib-source .warn{color:var(--danger)}
 
 /* ── Toast ── */
 #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:60;display:none;align-items:center;gap:10px;max-width:min(92vw,420px);
@@ -436,6 +438,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
         <div class="lib-section">
           <div class="lib-head">This photo</div>
           <div id="lib-status">No photo open</div>
+          <div id="lib-source"></div>
           <div class="lib-btns">
             <button class="lib-btn primary" id="lib-save-device">Save on device</button>
             <button class="lib-btn" id="lib-save-file">Save as file</button>
@@ -587,7 +590,10 @@ const PARAMS = ['exposure','contrast','highlights','shadows','whites','blacks',
 
 // TIFF-based containers (ARW, DNG, NEF, CR2): walk the IFD chain and collect
 // embedded JPEG previews (JPEGInterchangeFormat tags and JPEG-compressed strips).
-function parseTIFFPreviews(buf) {
+// `info` collects the largest ImageWidth/ImageLength seen across the IFD chain,
+// which for a RAW container is the sensor image — useful for reporting how much
+// smaller the embedded preview we actually edit is.
+function parseTIFFPreviews(buf, info) {
   const dv = new DataView(buf);
   if (buf.byteLength < 16) return [];
   const order = dv.getUint16(0, false);
@@ -604,6 +610,7 @@ function parseTIFFPreviews(buf) {
     const n = dv.getUint16(off, le);
     if (n === 0 || n > 1000) return;
     let jpgOff = -1, jpgLen = -1, stripOff = -1, stripLen = -1, comp = 0;
+    let ifdW = 0, ifdH = 0;
     for (let k = 0; k < n; k++) {
       const e = off + 2 + k*12;
       if (e + 12 > buf.byteLength) return;
@@ -611,7 +618,9 @@ function parseTIFFPreviews(buf) {
       const type  = dv.getUint16(e+2, le);
       const count = dv.getUint32(e+4, le);
       const val   = type === 3 ? dv.getUint16(e+8, le) : dv.getUint32(e+8, le);
-      if      (tag === 0x0201) jpgOff = val;                 // JPEGInterchangeFormat
+      if      (tag === 0x0100) ifdW = val;                   // ImageWidth
+      else if (tag === 0x0101) ifdH = val;                   // ImageLength
+      else if (tag === 0x0201) jpgOff = val;                 // JPEGInterchangeFormat
       else if (tag === 0x0202) jpgLen = val;                 // ...Length
       else if (tag === 0x0111 && count === 1) stripOff = val; // StripOffsets
       else if (tag === 0x0117 && count === 1) stripLen = val; // StripByteCounts
@@ -623,6 +632,11 @@ function parseTIFFPreviews(buf) {
           if (at + 4 <= buf.byteLength) readIFD(dv.getUint32(at, le), depth+1);
         }
       }
+    }
+    // sanity-bound: guards against a misread tag reporting an absurd sensor size
+    if (info && ifdW > 0 && ifdH > 0 && ifdW <= 100000 && ifdH <= 100000 &&
+        ifdW * ifdH > (info.rawW || 0) * (info.rawH || 0)) {
+      info.rawW = ifdW; info.rawH = ifdH;
     }
     if (jpgOff > 0 && jpgLen > 0 && jpgOff + jpgLen <= buf.byteLength)
       found.push([jpgOff, jpgLen]);
@@ -676,9 +690,9 @@ function scanJPEGs(buf) {
   return out;
 }
 
-function extractJPEGs(buf) {
+function extractJPEGs(buf, info) {
   // structured parsers first (exact offsets), byte scan as fallback
-  return [...parseTIFFPreviews(buf), ...parseRAFPreview(buf), ...scanJPEGs(buf)];
+  return [...parseTIFFPreviews(buf, info), ...parseRAFPreview(buf), ...scanJPEGs(buf)];
 }
 
 // resolves {img, blob} — the blob is kept so the decoded preview can be saved
@@ -1195,26 +1209,68 @@ function refreshTexture() {
   scheduleRender();
 }
 
+// A zoomed canvas is magnified by a CSS transform, so its backing store has to
+// carry the extra pixels — otherwise zooming just enlarges the fitted raster and
+// the detail that is actually in the source never reaches the screen.
+const MAX_DISPLAY_EDGE = 4096;
+
 function fitCanvas() {
-  if (!cropCanvas) return;
+  if (!cropCanvas) return false;
   const area = document.getElementById('canvas-area');
   const aw = area.clientWidth, ah = area.clientHeight;
   const iw = cropCanvas.width,  ih = cropCanvas.height;
   const scale = Math.min(aw/iw, ah/ih);
   const cssW = iw * scale, cssH = ih * scale;
-  // back the canvas at device resolution, but never above the image resolution
-  const dpr = Math.min(window.devicePixelRatio || 1, 1/scale, 3);
+
+  // backing pixels per CSS pixel: device resolution times the zoom, but never
+  // past the source's own resolution, and bounded so memory stays sane
+  const cap = Math.min(MAX_DISPLAY_EDGE, maxTexSize());
+  const density = Math.min(
+    (window.devicePixelRatio || 1) * view.z,   // what the screen could show
+    1 / scale,                                 // the source has no more detail
+    cap / Math.max(cssW, cssH),                // drawing-buffer ceiling
+    8);
+  const w = Math.max(1, Math.round(cssW * density));
+  const h = Math.max(1, Math.round(cssH * density));
+
   const canvas = document.getElementById('main-canvas');
-  canvas.width  = Math.max(1, Math.round(cssW * dpr));
-  canvas.height = Math.max(1, Math.round(cssH * dpr));
   canvas.style.width  = cssW + 'px';
   canvas.style.height = cssH + 'px';
+  // resizing drops the drawing buffer, so only touch it when it really changed
+  if (canvas.width === w && canvas.height === h) return false;
+  canvas.width  = w;
+  canvas.height = h;
+  return true;
+}
+
+// Re-render at the zoom's resolution once the gesture settles — doing it per
+// frame would reallocate the drawing buffer mid-pinch.
+let zoomResizeTimer = null;
+function scheduleZoomResize() {
+  clearTimeout(zoomResizeTimer);
+  zoomResizeTimer = setTimeout(() => {
+    if (fitCanvas()) scheduleRender();
+  }, 140);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Histogram
 // ─────────────────────────────────────────────────────────────────────────────
-function updateHistogram() {
+// readPixels pulls the whole drawing buffer back from the GPU, and that buffer
+// grows with zoom — so rate-limit it instead of paying it on every frame. The
+// context is preserveDrawingBuffer, so a trailing read still sees the last frame.
+const HIST_MIN_MS = 150;
+let histAt = 0, histTimer = null;
+
+function updateHistogram(force) {
+  clearTimeout(histTimer);
+  const now = performance.now();
+  if (!force && now - histAt < HIST_MIN_MS) {
+    histTimer = setTimeout(() => updateHistogram(true), HIST_MIN_MS);
+    return;
+  }
+  histAt = now;
+
   const mainCanvas = document.getElementById('main-canvas');
   // sample main canvas pixels
   const pixels = gl ? new Uint8Array(mainCanvas.width * mainCanvas.height * 4) : null;
@@ -2040,6 +2096,7 @@ function applyView() {
   const c = document.getElementById('main-canvas');
   c.style.transform = (view.z === 1) ? '' : `translate(${view.x}px,${view.y}px) scale(${view.z})`;
   if (!inCropMode()) c.style.cursor = view.z > 1 ? 'grab' : 'default';
+  scheduleZoomResize();
 }
 
 function resetView() { view.z = 1; view.x = 0; view.y = 0; applyView(); }
@@ -2261,9 +2318,10 @@ async function loadFile(file) {
   msg.style.color = '';
   msg.textContent = 'Loading…';
   let img, blob;
+  const info = {};
   try {
     const buf = await file.arrayBuffer();
-    const candidates = extractJPEGs(buf);
+    const candidates = extractJPEGs(buf, info);
     ({img, blob} = await loadBestJPEG(candidates.length ? candidates : [buf]));
   } catch(err) {
     // fallback: treat as JPEG/PNG directly
@@ -2284,6 +2342,7 @@ async function loadFile(file) {
   }
   beginSession(img, blob, {
     name: file.name, size: file.size, lastModified: file.lastModified,
+    rawW: info.rawW || 0, rawH: info.rawH || 0,
   });
 
   // an edit file opened before its photo was available applies now
@@ -2397,7 +2456,8 @@ function buildDoc() {
   return {
     format: DOC_FORMAT, version: DOC_VERSION, savedAt: new Date().toISOString(),
     source: {name: sourceMeta?.name || 'photo', size: sourceMeta?.size || 0,
-             lastModified: sourceMeta?.lastModified || 0},
+             lastModified: sourceMeta?.lastModified || 0,
+             rawW: sourceMeta?.rawW || 0, rawH: sourceMeta?.rawH || 0},
     edit: serializeEdit(),
     history: history.map(h => ({label: h.label, edit: {
       params: {...h.snap.params}, curvePoints: h.snap.curvePoints.map(p=>({x:p.x,y:p.y})),
@@ -2488,6 +2548,7 @@ async function saveToDevice(quiet) {
       doc: buildDoc(),
       preview: sourceBlob || null,
       thumb: makeThumb(),
+      w: sourceImg.naturalWidth, h: sourceImg.naturalHeight,
       driveFileId: currentProject.driveFileId || prev?.driveFileId || null,
       albums: prev?.albums || [],
     });
@@ -2778,14 +2839,33 @@ function wireDriveSetupLink() {
 }
 
 // ── Saved-edits panel ───────────────────────────────────────────────────────
+const megapixels = (w, h) => (w * h / 1e6).toFixed(1) + ' MP';
+
+// What the editor is actually working from: the preview embedded in the RAW,
+// not the sensor image. Worth stating plainly — it sets the detail ceiling.
+function describeSource(w, h, rawW, rawH) {
+  if (!w || !h) return '';
+  let s = `Editing the embedded preview · ${w} × ${h} (${megapixels(w, h)})`;
+  if (rawW && rawH && rawW * rawH > w * h * 1.1)
+    s += ` · RAW is ${rawW} × ${rawH} (${megapixels(rawW, rawH)})`;
+  return s;
+}
+
 function refreshLibraryStatus() {
   const el = document.getElementById('lib-status');
   if (!el) return;
-  if (!sourceImg) { el.textContent = 'No photo open'; return; }
+  const src = document.getElementById('lib-source');
+  if (!sourceImg) {
+    el.textContent = 'No photo open';
+    if (src) src.textContent = '';
+    return;
+  }
   const when = lastSavedAt ? new Date(lastSavedAt).toLocaleTimeString() : null;
   const n = history.length;
   el.textContent = `${sourceMeta?.name || 'photo'} · ${n} ${n === 1 ? 'edit' : 'edits'}` +
     (when ? ` · saved ${when}` : ' · not saved yet');
+  if (src) src.textContent = describeSource(
+    sourceImg.naturalWidth, sourceImg.naturalHeight, sourceMeta?.rawW, sourceMeta?.rawH);
 }
 
 async function renderLibraryList() {
@@ -2861,12 +2941,13 @@ function blankDoc(meta) {
 
 // Decode a file far enough to store it, without disturbing the open session.
 async function decodeForImport(file) {
+  const info = {};
   try {
     const buf = await file.arrayBuffer();
-    const candidates = extractJPEGs(buf);
-    return await loadBestJPEG(candidates.length ? candidates : [buf]);
+    const candidates = extractJPEGs(buf, info);
+    return {...await loadBestJPEG(candidates.length ? candidates : [buf]), info};
   } catch(err) {
-    return {img: await blobToImage(file), blob: file};
+    return {img: await blobToImage(file), blob: file, info};
   }
 }
 
@@ -2903,11 +2984,14 @@ async function importFiles(files) {
         prev.albums = prev.albums || [];
         if (album && !prev.albums.includes(album)) { prev.albums.push(album); await idbPut(prev); }
       } else {
-        const {img, blob} = await decodeForImport(f);
+        const {img, blob, info} = await decodeForImport(f);
+        meta.rawW = info.rawW || 0;
+        meta.rawH = info.rawH || 0;
         await idbPut({
           id, name: f.name, savedAt: Date.now(), edits: 0,
           doc: blankDoc(meta), preview: blob || null,
           thumb: thumbFrom(img, img.naturalWidth, img.naturalHeight),
+          w: img.naturalWidth, h: img.naturalHeight,
           driveFileId: null, albums: album ? [album] : [],
         });
       }
@@ -3111,7 +3195,8 @@ function renderPhotoGrid() {
       + (pg.selection.has(p.id) ? ' selected' : '')
       + (currentProject && currentProject.id === p.id ? ' current' : '');
     tile.draggable = true;
-    tile.title = p.name;
+    const dims = describeSource(p.w, p.h, p.doc?.source?.rawW, p.doc?.source?.rawH);
+    tile.title = dims ? `${p.name}\n${dims}` : p.name;
     tile.dataset.id = p.id;
 
     if (p.thumb) {
