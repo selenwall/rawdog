@@ -502,7 +502,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
     <div id="pg-grid-wrap">
       <div id="pg-selbar">
         <span id="pg-selcount">0 selected</span>
-        <button class="sel-btn" id="pg-sel-export">Export…</button>
+        <button class="sel-btn" id="pg-sel-auto">✦ Auto adjust</button>
+    <button class="sel-btn" id="pg-sel-edit">Edit…</button>
+    <button class="sel-btn" id="pg-sel-export">Export…</button>
     <button class="sel-btn" id="pg-sel-add">Add to album…</button>
         <button class="sel-btn" id="pg-sel-remove" style="display:none">Remove from album</button>
         <button class="sel-btn danger" id="pg-sel-delete">Delete</button>
@@ -2253,8 +2255,13 @@ function applyPreset(i) {
 // Auto adjust (exposure, white balance, color)
 // ─────────────────────────────────────────────────────────────────────────────
 function computeAuto() {
-  if (!cropCanvas) return null;
-  const src = previewCanvas || cropCanvas;
+  return cropCanvas ? computeAutoFor(previewCanvas || cropCanvas) : null;
+}
+
+// Metering is per photo — a selection auto-adjusted in bulk gets each frame's
+// own reading, not one frame's numbers copied across the rest.
+function computeAutoFor(src) {
+  if (!src) return null;
   const s = 128 / Math.max(src.width, src.height);
   const w = Math.max(1, Math.round(src.width  * s));
   const h = Math.max(1, Math.round(src.height * s));
@@ -4004,6 +4011,29 @@ function wirePhotos() {
   document.getElementById('drop-photos-btn').addEventListener('click', openPhotos);
   document.getElementById('pg-close').addEventListener('click', closePhotos);
 
+  document.getElementById('pg-sel-auto').addEventListener('click', () => {
+    if (pg.selection.size) editSelection([...pg.selection], 'auto', null, 'Auto adjust');
+  });
+  document.getElementById('pg-sel-edit').addEventListener('click', e => {
+    e.stopPropagation();
+    const ids = [...pg.selection];
+    if (!ids.length) return;
+    const items = [{label:'Apply to selection', head:true}];
+    if (sourceImg && currentProject && !ids.includes(currentProject.id))
+      items.push({label:`Copy look from ${sourceMeta?.name || 'the open photo'}`,
+                  onClick: () => editSelection(ids, 'copy', openEditPayload(), 'Copied look')});
+    let group = null;
+    PRESETS.forEach((p, i) => {
+      if (p.group !== group) {
+        group = p.group;
+        items.push({label: group === 'film' ? 'Film simulations' : 'Looks', head:true});
+      }
+      items.push({label: p.name, onClick: () => editSelection(ids, 'preset', i, p.name)});
+    });
+    items.push({label:'Reset edits', danger:true,
+                onClick: () => editSelection(ids, 'reset', null, 'Reset')});
+    openPgMenu(e.currentTarget, items);
+  });
   document.getElementById('pg-sel-clear').addEventListener('click', clearPgSelection);
   document.getElementById('pg-sel-delete').addEventListener('click', () => deletePhotos([...pg.selection]));
   document.getElementById('pg-sel-remove').addEventListener('click', () => {
@@ -4213,6 +4243,98 @@ async function exportSelection(ids, format, maxEdge, quality) {
   toast(failed.length
     ? `Exported ${entries.length}, ${failed.length} failed${stopped}`
     : `Exported ${entries.length} photo${entries.length > 1 ? 's' : ''}${stopped}`);
+}
+
+// ── Batch edits ─────────────────────────────────────────────────────────────
+// The same change across a selection. Work is done on each photo's stored
+// preview rather than its RAW: metering and thumbnails only need that much, and
+// it keeps a 24-frame album to a couple of seconds instead of a couple of
+// minutes. The edit itself is resolution-independent, so opening or exporting a
+// photo afterwards still renders it at full quality.
+
+// the open photo's look, without its geometry — that stays per photo
+function openEditPayload() {
+  const params = {};
+  for (const k of PARAMS) params[k] = state[k];
+  return {params, curvePoints: state.curvePoints.map(p => ({x:p.x, y:p.y})),
+          splitShadow: state.splitShadow.slice(), splitHigh: state.splitHigh.slice()};
+}
+
+function applyLookToEdit(e, mode, payload) {
+  if (mode === 'auto') return false;   // handled by the caller, which needs pixels
+  if (mode === 'preset') {
+    const p = PRESETS[payload];
+    for (const k of PARAMS) e.params[k] = p.s[k] ?? 0;
+    e.curvePoints = p.curve ? JSON.parse(JSON.stringify(p.curve)) : [{x:0,y:0},{x:1,y:1}];
+    e.splitShadow = p.split ? p.split.shadow.slice() : [0,0,0];
+    e.splitHigh   = p.split ? p.split.high.slice()   : [0,0,0];
+  } else if (mode === 'copy') {
+    for (const k of PARAMS) e.params[k] = payload.params[k] ?? 0;
+    e.curvePoints = payload.curvePoints.map(p => ({x:p.x, y:p.y}));
+    e.splitShadow = payload.splitShadow.slice();
+    e.splitHigh   = payload.splitHigh.slice();
+  } else if (mode === 'reset') {
+    for (const k of PARAMS) e.params[k] = 0;
+    e.curvePoints = [{x:0,y:0},{x:1,y:1}];
+    e.splitShadow = [0,0,0]; e.splitHigh = [0,0,0];
+  }
+  return true;
+}
+
+async function editSelection(ids, mode, payload, label) {
+  if (!ids.length) return;
+  if (!gl) { initGL(document.getElementById('main-canvas')); if (!gl) return; }
+  if (sourceImg && currentProject) await saveToDevice(true);
+
+  showProgress(`${label} · ${ids.length} photo${ids.length > 1 ? 's' : ''}`);
+  let done = 0, failed = 0;
+  try {
+    for (let i = 0; i < ids.length; i++) {
+      if (prog.cancelled) break;
+      const rec = await idbGet(ids[i]).catch(() => null);
+      updateProgress(i, ids.length, rec ? rec.name : '');
+      await nextFrame();
+      if (!rec?.doc?.edit || !rec.preview) { failed++; continue; }
+      try {
+        const img  = await decodeUpright(rec.preview, rec.doc.source?.orientation);
+        const work = workingCanvasFor(img, rec.doc.edit);
+        const e    = rec.doc.edit;
+        const before = JSON.parse(JSON.stringify(e));   // the undo step
+        if (mode === 'auto') {
+          const adj = computeAutoFor(work);
+          if (!adj) { failed++; continue; }
+          Object.assign(e.params, adj);
+        } else {
+          applyLookToEdit(e, mode, payload);
+        }
+        rec.doc.history = (rec.doc.history || []).concat([{label, edit: before}]);
+        rec.doc.savedAt = new Date().toISOString();
+        rec.edits   = rec.doc.history.length;
+        rec.savedAt = Date.now();
+        rec.thumb   = thumbWithEdit(work, stateFromEdit(e), e.curvePoints);
+        rec.thumbV  = THUMB_VERSION;
+        await idbPut(rec);
+        done++;
+      } catch(err) {
+        console.warn('Batch edit failed for', rec.name, err);
+        failed++;
+      }
+    }
+  } finally {
+    hideProgress();
+    if (cropCanvas && gl) { uploadLUT(buildCurveLUT(state.curvePoints)); scheduleRender(); }
+  }
+
+  // the photo on screen may have been part of the selection
+  if (currentProject && ids.includes(currentProject.id)) {
+    const rec = await idbGet(currentProject.id).catch(() => null);
+    if (rec?.doc) applyEditDoc(rec.doc);
+  }
+  await loadPhotos();
+  if (photosIsOpen()) renderPhotos();
+  const stopped = prog.cancelled ? ' (stopped early)' : '';
+  toast(failed ? `${label}: ${done} done, ${failed} skipped${stopped}`
+               : `${label} · ${done} photo${done > 1 ? 's' : ''}${stopped}`);
 }
 
 // ── Toast ───────────────────────────────────────────────────────────────────
