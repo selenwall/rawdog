@@ -305,7 +305,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
     <div id="drop-overlay">
       <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
       <p id="drop-msg">Drop RAW files here</p>
-      <small>Sony ARW · DNG · CR2 · NEF · RAF</small>
+      <small>Sony ARW · DNG · CR2 · NEF · RAF — developed at full sensor resolution</small>
       <div style="display:flex;gap:8px;pointer-events:all;align-items:center">
         <button id="open-btn">Open files</button>
         <button class="tool-btn" id="drop-photos-btn" style="display:none">Photos</button>
@@ -573,12 +573,24 @@ const state = {
 let baseState = null;
 
 // Source image (original, never mutated)
-let sourceImg = null;       // HTMLImageElement decoded from embedded JPEG
+let sourceImg = null;       // image or canvas: embedded preview, or developed RAW
+let sourceKind = 'none';    // 'preview' | 'raw' | 'image'
 let baseCanvas = null;      // sourceImg with rotation/flip/crop baked in
-let cropCanvas = null;      // baseCanvas with straighten applied (sampled by GPU)
+let cropCanvas = null;      // baseCanvas with straighten applied — full working res
+let previewCanvas = null;   // cropCanvas downscaled to fit the GPU (fitted view)
 let gl = null, glProgram = null;
-let texCurrent = null;
+let texCurrent = null;      // fitted-view texture (previewCanvas)
+let texRoi = null;          // zoomed-view texture (native-res tile of cropCanvas)
 let histMode = 'rgb';
+
+// sourceImg can be an <img> (preview JPEG) or a canvas (developed RAW)
+const srcW = img => img.naturalWidth  || img.width;
+const srcH = img => img.naturalHeight || img.height;
+
+// Zoomed-in rendering state. When the view settles at z>1 the visible region is
+// re-rendered from cropCanvas at up to native resolution; `rect` is that region
+// in cropCanvas pixels and `baked` the view it was rendered for.
+const roi = {active:false, rect:null, texW:0, texH:0, quad:null, baked:{z:1,x:0,y:0}};
 
 const PARAMS = ['exposure','contrast','highlights','shadows','whites','blacks',
   'temp','tint','vibrance','sat','mixr','mixy','mixg','mixc','mixb','mixm',
@@ -723,11 +735,18 @@ const VS_SRC = `
 attribute vec2 a_pos;
 attribute vec2 a_uv;
 varying vec2 v_uv;
-void main(){gl_Position=vec4(a_pos,0,1);v_uv=a_uv;}
+// xy: clip-space offset, zw: scale — lets a render cover a sub-rect of the
+// canvas (zoomed-in view) instead of always the full quad
+uniform vec4 u_quad;
+void main(){gl_Position=vec4(a_pos*u_quad.zw+u_quad.xy,0,1);v_uv=a_uv;}
 `;
 
 const FS_SRC = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
 precision mediump float;
+#endif
 varying vec2 v_uv;
 uniform sampler2D u_tex;
 // sliders
@@ -755,6 +774,11 @@ uniform vec3 u_splitHigh;    // rgb tint applied to highlights
 uniform sampler2D u_curve_lut;
 uniform vec2 u_texSize;
 uniform float u_time;
+// The sampled texture may be just a region of the full image (zoomed view,
+// export tile). These map texture uv -> full-image uv so position-dependent
+// effects (vignette, grain) stay anchored to the photo, not the tile.
+uniform vec2 u_uvOff;
+uniform vec2 u_uvScale;
 
 vec3 srgbToLinear(vec3 c){return pow(max(c,0.),vec3(2.2));}
 vec3 linearToSrgb(vec3 c){return pow(max(c,0.),vec3(1.0/2.2));}
@@ -912,8 +936,9 @@ void main(){
   col = clamp(col, 0., 1.);
 
   // ── Vignette ──
+  vec2 iuv = u_uvOff + uv * u_uvScale;   // position within the full image
   if(abs(u_vignette) > 0.001) {
-    vec2 cv = uv - 0.5;
+    vec2 cv = iuv - 0.5;
     float dist = dot(cv, cv) * 2.5;
     float vig = smoothstep(0.4, 1.4, dist);
     col = mix(col, u_vignette < 0. ? vec3(0.) : vec3(1.), vig * abs(u_vignette) * 0.8);
@@ -922,7 +947,7 @@ void main(){
   // ── Grain ──
   if(u_grain > 0.001) {
     // cheap pseudo-random
-    float seed = dot(uv, vec2(12.9898, 78.233)) + u_time;
+    float seed = dot(iuv, vec2(12.9898, 78.233)) + u_time;
     float noise = fract(sin(seed)*43758.5453);
     noise = (noise - 0.5) * u_grain * 0.12;
     col = clamp(col + noise, 0., 1.);
@@ -1024,19 +1049,9 @@ function uploadLUT(lut) {
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, 256, 1, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, lut);
 }
 
-let rafId = null;
-function render() {
-  if (!gl || !texCurrent || !cropCanvas) return;
-  const canvas = document.getElementById('main-canvas');
+// slider-driven uniforms, shared by the interactive view and export tiles
+function setAdjustUniforms() {
   const s = state;
-  gl.viewport(0, 0, canvas.width, canvas.height);
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, texCurrent);
-  gl.uniform1i(gl.getUniformLocation(glProgram,'u_tex'), 0);
-  gl.activeTexture(gl.TEXTURE1);
-  gl.bindTexture(gl.TEXTURE_2D, texLUT);
-  gl.uniform1i(gl.getUniformLocation(glProgram,'u_curve_lut'), 1);
-
   const loc = n => gl.getUniformLocation(glProgram, n);
   gl.uniform1f(loc('u_exposure'),   s.exposure);
   gl.uniform1f(loc('u_contrast'),   s.contrast/100);
@@ -1058,8 +1073,45 @@ function render() {
   gl.uniform3f(loc('u_mixB'),       s.mixc/100, s.mixb/100, s.mixm/100);
   gl.uniform3fv(loc('u_splitShadow'), s.splitShadow);
   gl.uniform3fv(loc('u_splitHigh'),   s.splitHigh);
-  gl.uniform2f(loc('u_texSize'),    cropCanvas.width, cropCanvas.height);
+}
+
+let rafId = null;
+function render() {
+  if (!gl || !texCurrent || !cropCanvas) return;
+  const canvas = document.getElementById('main-canvas');
+  const zoomed = roi.active && texRoi;
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  // parts of the canvas the photo doesn't cover show the workspace colour
+  gl.clearColor(0.875, 0.906, 0.922, 1);   // --canvas-bg #dfe7eb
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, zoomed ? texRoi : texCurrent);
+  gl.uniform1i(gl.getUniformLocation(glProgram,'u_tex'), 0);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, texLUT);
+  gl.uniform1i(gl.getUniformLocation(glProgram,'u_curve_lut'), 1);
+
+  setAdjustUniforms();
+  const loc = n => gl.getUniformLocation(glProgram, n);
   gl.uniform1f(loc('u_time'),       performance.now()/1000);
+
+  if (zoomed) {
+    // texture holds only the visible region: map effects to full-image space
+    // and draw the quad over just the region the photo occupies on screen
+    gl.uniform2f(loc('u_texSize'), roi.texW, roi.texH);
+    gl.uniform2f(loc('u_uvOff'),   roi.rect.x / cropCanvas.width, roi.rect.y / cropCanvas.height);
+    gl.uniform2f(loc('u_uvScale'), roi.rect.w / cropCanvas.width, roi.rect.h / cropCanvas.height);
+    const q = roi.quad;   // css-px rect of the region within the canvas
+    const cx0 = 2*q.x0/q.cw - 1, cx1 = 2*q.x1/q.cw - 1;
+    const cy0 = 1 - 2*q.y0/q.ch, cy1 = 1 - 2*q.y1/q.ch;   // clip y is up
+    gl.uniform4f(loc('u_quad'), (cx0+cx1)/2, (cy0+cy1)/2, (cx1-cx0)/2, (cy0-cy1)/2);
+  } else {
+    gl.uniform2f(loc('u_texSize'), previewCanvas ? previewCanvas.width : cropCanvas.width,
+                                   previewCanvas ? previewCanvas.height : cropCanvas.height);
+    gl.uniform2f(loc('u_uvOff'),   0, 0);
+    gl.uniform2f(loc('u_uvScale'), 1, 1);
+    gl.uniform4f(loc('u_quad'),    0, 0, 1, 1);
+  }
 
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   updateHistogram();
@@ -1076,6 +1128,44 @@ function scheduleRender() {
 // ─────────────────────────────────────────────────────────────────────────────
 function maxTexSize() {
   return gl ? gl.getParameter(gl.MAX_TEXTURE_SIZE) : 4096;
+}
+
+// The working canvases hold the image at native resolution — the GPU texture
+// limit no longer caps them; only a memory budget does. 2D canvases of 24MP
+// (a full A7C frame) are fine on desktop; low-memory devices get less.
+function maxSourceArea() {
+  const mem = navigator.deviceMemory || 8;
+  return mem <= 4 ? 24e6 : 50e6;
+}
+const MAX_SOURCE_EDGE = 16384;   // conservative 2D-canvas edge guard
+
+// Downscale with repeated halving — a single drawImage to a much smaller size
+// uses a small filter kernel and drops detail; stepping halves keeps it clean.
+function downscaleHQ(src, w, h) {
+  let cw = srcW(src), ch = srcH(src);
+  let cur = src;
+  while (cw >= w * 2 && ch >= h * 2) {
+    cw = Math.max(w, Math.round(cw / 2));
+    ch = Math.max(h, Math.round(ch / 2));
+    const c = document.createElement('canvas');
+    c.width = cw; c.height = ch;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(cur, 0, 0, cw, ch);
+    cur = c;
+  }
+  if (cw === w && ch === h && cur !== src) return cur;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(cur, 0, 0, w, h);
+  return c;
+}
+
+// scale factor that fits w×h inside the working-resolution budget
+function sourceFitScale(w, h) {
+  return Math.min(1, Math.sqrt(maxSourceArea() / (w * h)), MAX_SOURCE_EDGE / Math.max(w, h));
 }
 
 function rotateBase90() {
@@ -1100,16 +1190,18 @@ function flipBase(horizontal) {
   baseCanvas = c;
 }
 
-// sourceImg downscaled to fit the GPU, with no geometry applied yet
+// sourceImg at native resolution (within the memory budget), no geometry yet
 function baseFromSource() {
   if (!sourceImg) return;
   const img = sourceImg;
-  const maxTex = maxTexSize();
-  const scale = Math.min(1, maxTex / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = srcW(img), h = srcH(img);
+  const scale = sourceFitScale(w, h);
+  const tw = Math.max(1, Math.round(w * scale));
+  const th = Math.max(1, Math.round(h * scale));
+  if (scale < 1) { baseCanvas = downscaleHQ(img, tw, th); return; }
   const c = document.createElement('canvas');
-  c.width  = Math.max(1, Math.round(img.naturalWidth  * scale));
-  c.height = Math.max(1, Math.round(img.naturalHeight * scale));
-  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  c.width = tw; c.height = th;
+  c.getContext('2d').drawImage(img, 0, 0, tw, th);
   baseCanvas = c;
 }
 
@@ -1187,12 +1279,12 @@ function buildCropCanvas() {
 
   const cw = src.width * cosA + src.height * sinA;
   const ch = src.width * sinA + src.height * cosA;
-  const maxTex = maxTexSize();
-  const s = Math.min(1, maxTex / Math.max(cw, ch));
+  const s = sourceFitScale(cw, ch);   // straightening grows bounds a little
   const cc = document.createElement('canvas');
   cc.width  = Math.max(1, Math.round(cw * s));
   cc.height = Math.max(1, Math.round(ch * s));
   const ctx = cc.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
   ctx.translate(cc.width/2, cc.height/2);
   ctx.scale(s, s);
   ctx.rotate(angle);
@@ -1200,36 +1292,48 @@ function buildCropCanvas() {
   cropCanvas = cc;
 }
 
+// The fitted view samples a GPU-sized copy of the full-res working image.
+function buildPreviewCanvas() {
+  if (!cropCanvas) return;
+  const maxTex = maxTexSize();
+  const s = Math.min(1, maxTex / Math.max(cropCanvas.width, cropCanvas.height));
+  previewCanvas = s < 1
+    ? downscaleHQ(cropCanvas, Math.max(1, Math.round(cropCanvas.width * s)),
+                              Math.max(1, Math.round(cropCanvas.height * s)))
+    : cropCanvas;
+}
+
 function refreshTexture() {
   if (!cropCanvas || !gl) return;
-  uploadTexture(cropCanvas);
+  buildPreviewCanvas();
+  uploadTexture(previewCanvas);
   uploadLUT(buildCurveLUT(state.curvePoints));
+  resetView();          // leaves zoomed mode, if active
   fitCanvas();
-  resetView();
   scheduleRender();
 }
 
-// A zoomed canvas is magnified by a CSS transform, so its backing store has to
-// carry the extra pixels — otherwise zooming just enlarges the fitted raster and
-// the detail that is actually in the source never reaches the screen.
+// display-density ceiling for the fitted (unzoomed) view
 const MAX_DISPLAY_EDGE = 4096;
 
-function fitCanvas() {
-  if (!cropCanvas) return false;
+// css size of the photo fitted inside the canvas area
+function fittedCssSize() {
   const area = document.getElementById('canvas-area');
-  const aw = area.clientWidth, ah = area.clientHeight;
-  const iw = cropCanvas.width,  ih = cropCanvas.height;
-  const scale = Math.min(aw/iw, ah/ih);
-  const cssW = iw * scale, cssH = ih * scale;
+  const scale = Math.min(area.clientWidth / cropCanvas.width,
+                         area.clientHeight / cropCanvas.height);
+  return {cssW: cropCanvas.width * scale, cssH: cropCanvas.height * scale, scale};
+}
 
-  // backing pixels per CSS pixel: device resolution times the zoom, but never
-  // past the source's own resolution, and bounded so memory stays sane
+// size the canvas for the fitted view (zoomed rendering is handled by enterRoi)
+function fitCanvas() {
+  if (!cropCanvas || roi.active) return false;
+  const {cssW, cssH, scale} = fittedCssSize();
+
   const cap = Math.min(MAX_DISPLAY_EDGE, maxTexSize());
   const density = Math.min(
-    (window.devicePixelRatio || 1) * view.z,   // what the screen could show
-    1 / scale,                                 // the source has no more detail
-    cap / Math.max(cssW, cssH),                // drawing-buffer ceiling
-    8);
+    window.devicePixelRatio || 1,   // what the screen can show
+    1 / scale,                      // the source has no more detail
+    cap / Math.max(cssW, cssH));    // drawing-buffer ceiling
   const w = Math.max(1, Math.round(cssW * density));
   const h = Math.max(1, Math.round(cssH * density));
 
@@ -1243,14 +1347,104 @@ function fitCanvas() {
   return true;
 }
 
-// Re-render at the zoom's resolution once the gesture settles — doing it per
-// frame would reallocate the drawing buffer mid-pinch.
+// ── Zoomed rendering ────────────────────────────────────────────────────────
+// While a zoom/pan gesture is in flight the canvas is just CSS-transformed
+// (cheap). Once it settles, the visible region is re-rendered from the
+// full-resolution working image — so zooming in reveals the detail that is
+// actually in the file, the way magnifying on the camera body does.
 let zoomResizeTimer = null;
 function scheduleZoomResize() {
   clearTimeout(zoomResizeTimer);
-  zoomResizeTimer = setTimeout(() => {
-    if (fitCanvas()) scheduleRender();
-  }, 140);
+  zoomResizeTimer = setTimeout(applySettledView, 140);
+}
+
+function applySettledView() {
+  if (!cropCanvas || !gl) return;
+  if (view.z <= 1.001) {
+    if (roi.active) exitRoi();
+    else if (fitCanvas()) scheduleRender();
+    return;
+  }
+  enterRoi();
+}
+
+function uploadRoiTexture(canvas) {
+  if (!texRoi) {
+    texRoi = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texRoi);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  }
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, texRoi);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+}
+
+// Render the visible region at up to native resolution. The canvas element
+// grows to cover the whole viewing area; the photo is drawn into the part of
+// it the CSS transform used to occupy.
+function enterRoi() {
+  // settled at the exact view already rendered — nothing to redo
+  if (roi.active && Math.abs(roi.baked.z - view.z) < 1e-3 &&
+      Math.abs(roi.baked.x - view.x) < .5 && Math.abs(roi.baked.y - view.y) < .5) return;
+  const area = document.getElementById('canvas-area');
+  const aw = area.clientWidth, ah = area.clientHeight;
+  const {cssW, cssH} = fittedCssSize();
+
+  // where the (transformed) photo sits in area coordinates
+  const iw = cssW * view.z, ih = cssH * view.z;
+  const ix0 = aw/2 + view.x - iw/2, iy0 = ah/2 + view.y - ih/2;
+  const vx0 = Math.max(0, ix0),      vy0 = Math.max(0, iy0);
+  const vx1 = Math.min(aw, ix0 + iw), vy1 = Math.min(ah, iy0 + ih);
+  if (vx1 - vx0 < 1 || vy1 - vy0 < 1) return;
+
+  // that region in working-image pixels
+  const W = cropCanvas.width, H = cropCanvas.height;
+  const sx = (vx0 - ix0) / iw * W, sy = (vy0 - iy0) / ih * H;
+  const sw = (vx1 - vx0) / iw * W, sh = (vy1 - vy0) / ih * H;
+
+  const dpr = window.devicePixelRatio || 1;
+  const maxT = maxTexSize();
+  // canvas backing density: the screen's, bounded by the drawing-buffer limit
+  const db = Math.min(dpr, maxT / Math.max(aw, ah));
+  // tile resolution: what the screen shows, but never beyond the source itself
+  const cssTW = vx1 - vx0, cssTH = vy1 - vy0;
+  const tScale = Math.min(db, sw / cssTW, maxT / Math.max(cssTW, cssTH));
+  const texW = Math.max(1, Math.round(cssTW * tScale));
+  const texH = Math.max(1, Math.round(cssTH * tScale));
+
+  const tile = document.createElement('canvas');
+  tile.width = texW; tile.height = texH;
+  const tctx = tile.getContext('2d');
+  tctx.imageSmoothingQuality = 'high';
+  tctx.drawImage(cropCanvas, sx, sy, sw, sh, 0, 0, texW, texH);
+  uploadRoiTexture(tile);
+
+  const canvas = document.getElementById('main-canvas');
+  canvas.style.width  = aw + 'px';
+  canvas.style.height = ah + 'px';
+  canvas.style.transform = '';
+  canvas.width  = Math.max(1, Math.round(aw * db));
+  canvas.height = Math.max(1, Math.round(ah * db));
+
+  roi.active = true;
+  roi.rect = {x: sx, y: sy, w: sw, h: sh};
+  roi.texW = texW; roi.texH = texH;
+  roi.quad = {x0: vx0, y0: vy0, x1: vx1, y1: vy1, cw: aw, ch: ah};
+  roi.baked = {z: view.z, x: view.x, y: view.y};
+  scheduleRender();
+}
+
+function exitRoi() {
+  roi.active = false;
+  roi.rect = null;
+  const canvas = document.getElementById('main-canvas');
+  canvas.style.transform = '';
+  fitCanvas();
+  scheduleRender();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1272,11 +1466,22 @@ function updateHistogram(force) {
   histAt = now;
 
   const mainCanvas = document.getElementById('main-canvas');
-  // sample main canvas pixels
-  const pixels = gl ? new Uint8Array(mainCanvas.width * mainCanvas.height * 4) : null;
-  if (pixels) gl.readPixels(0, 0, mainCanvas.width, mainCanvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+  // sample only the photo's pixels — when zoomed, the canvas may also hold
+  // workspace background around the image, which would pollute the histogram
+  let rx = 0, ry = 0, rw = mainCanvas.width, rh = mainCanvas.height;
+  if (roi.active && roi.quad) {
+    const q = roi.quad;
+    const dx = mainCanvas.width / q.cw, dy = mainCanvas.height / q.ch;
+    rx = Math.max(0, Math.floor(q.x0 * dx));
+    rw = Math.max(1, Math.min(mainCanvas.width - rx, Math.ceil((q.x1 - q.x0) * dx)));
+    const topPx = Math.max(0, Math.floor(q.y0 * dy));
+    rh = Math.max(1, Math.min(mainCanvas.height - topPx, Math.ceil((q.y1 - q.y0) * dy)));
+    ry = mainCanvas.height - topPx - rh;   // GL rows count from the bottom
+  }
+  const pixels = gl ? new Uint8Array(rw * rh * 4) : null;
+  if (pixels) gl.readPixels(rx, ry, rw, rh, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
 
-  const hists = computeHists(pixels, mainCanvas.width * mainCanvas.height);
+  const hists = computeHists(pixels, rw * rh);
   drawHistogram(document.getElementById('hist-panel-canvas'), hists);
   drawHistogram(document.getElementById('histogram-canvas'), hists);
 }
@@ -1866,11 +2071,10 @@ function prepareThumbSource() {
   const tc = getThumbCtx();
   if (!tc || !cropCanvas) return;
   const g = tc.gl;
-  const small = document.createElement('canvas');
-  const s = 96 / Math.max(cropCanvas.width, cropCanvas.height);
-  small.width  = Math.max(1, Math.round(cropCanvas.width  * s));
-  small.height = Math.max(1, Math.round(cropCanvas.height * s));
-  small.getContext('2d').drawImage(cropCanvas, 0, 0, small.width, small.height);
+  const src = previewCanvas || cropCanvas;   // avoid resampling the full-res image
+  const s = 96 / Math.max(src.width, src.height);
+  const small = downscaleHQ(src, Math.max(1, Math.round(src.width  * s)),
+                                 Math.max(1, Math.round(src.height * s)));
   g.activeTexture(g.TEXTURE0); g.bindTexture(g.TEXTURE_2D, tc.tex);
   g.texImage2D(g.TEXTURE_2D,0,g.RGBA,g.RGBA,g.UNSIGNED_BYTE,small);
   const lut = buildCurveLUT([{x:0,y:0},{x:1,y:1}]);
@@ -1912,6 +2116,9 @@ function renderPresetThumb(canvas, preset) {
   g.uniform3fv(loc('u_splitHigh'),   preset.split ? preset.split.high   : [0,0,0]);
   g.uniform2f(loc('u_texSize'),tc.srcW,tc.srcH);
   g.uniform1f(loc('u_time'),0);
+  g.uniform2f(loc('u_uvOff'),0,0);
+  g.uniform2f(loc('u_uvScale'),1,1);
+  g.uniform4f(loc('u_quad'),0,0,1,1);
   g.viewport(0,0,tc.canvas.width,tc.canvas.height);
   g.drawArrays(g.TRIANGLE_STRIP,0,4);
 
@@ -1947,13 +2154,14 @@ function applyPreset(i) {
 // ─────────────────────────────────────────────────────────────────────────────
 function computeAuto() {
   if (!cropCanvas) return null;
-  const s = 128 / Math.max(cropCanvas.width, cropCanvas.height);
-  const w = Math.max(1, Math.round(cropCanvas.width  * s));
-  const h = Math.max(1, Math.round(cropCanvas.height * s));
+  const src = previewCanvas || cropCanvas;
+  const s = 128 / Math.max(src.width, src.height);
+  const w = Math.max(1, Math.round(src.width  * s));
+  const h = Math.max(1, Math.round(src.height * s));
   const oc = document.createElement('canvas');
   oc.width = w; oc.height = h;
   const ctx = oc.getContext('2d', {willReadFrequently:true});
-  ctx.drawImage(cropCanvas, 0, 0, w, h);
+  ctx.drawImage(src, 0, 0, w, h);
   const d = ctx.getImageData(0, 0, w, h).data;
   const n = w * h;
 
@@ -2026,15 +2234,16 @@ function computeAuto() {
   // EV available before the near-whites clip; judged at p95 so that small
   // speculars don't veto lifting a genuinely dark frame
   const headroom = 2.2 * Math.log2(0.90 / Math.max(0.45, p95));
-  if (med < 0.34 && headroom > 0.05) {
-    // underexposed: lift the midtones, but never past that headroom
-    exposure = Math.min(2.2 * Math.log2(0.40 / Math.max(0.04, med)), headroom);
-  } else if (p5 > 0.42 && med > 0.70) {
+  if (med < 0.38 && headroom > 0.05) {
+    // underexposed: lift the midtones toward a balanced middle, but never
+    // past that headroom
+    exposure = Math.min(2.2 * Math.log2(0.44 / Math.max(0.04, med)), headroom);
+  } else if (p5 > 0.35 && med > 0.62) {
     // washed out: even the darkest tones sit well off the floor, so the whole
     // frame really is too bright. Clipping alone is not evidence — clipped
     // highlights stay clipped when exposure comes down, only darker. A high-key
     // scene that still holds shadow detail fails this test, as it should.
-    exposure = 2.2 * Math.log2(0.55 / med);
+    exposure = 2.2 * Math.log2(0.54 / med);
   }
   // asymmetric on purpose: darkening a good photo is the more damaging mistake,
   // and blacks/contrast recover a washed-out frame better than exposure does
@@ -2063,9 +2272,11 @@ function computeAuto() {
   const whites   = p99 < 0.90 ? Math.min(50, Math.round((0.95 - p99) * 120)) : 0;
   const spread   = p99 - p1;
   const contrast = spread < 0.75 ? Math.min(25, Math.round((0.8 - spread) * 60)) : 0;
-  const vibrance = Math.max(0, Math.min(30, Math.round((0.3 - avgSat) * 100)));
+  const vibrance = Math.max(0, Math.min(30, Math.round((0.32 - avgSat) * 100)));
+  // and rein colour back in when the frame is already heavily saturated
+  const sat = avgSat > 0.45 ? -Math.min(15, Math.round((avgSat - 0.45) * 60)) : 0;
 
-  return {exposure, contrast, highlights, shadows, whites, blacks, temp, tint, vibrance};
+  return {exposure, contrast, highlights, shadows, whites, blacks, temp, tint, vibrance, sat};
 }
 
 function applyAuto() {
@@ -2092,19 +2303,37 @@ function inCropMode() {
   return document.getElementById('crop-panel').style.display !== 'none';
 }
 
+const MAX_ZOOM = 12;   // enough to inspect a 24MP frame well past 1:1
+
 function applyView() {
   const c = document.getElementById('main-canvas');
-  c.style.transform = (view.z === 1) ? '' : `translate(${view.x}px,${view.y}px) scale(${view.z})`;
+  if (roi.active) {
+    // the canvas holds a render baked for roi.baked — CSS shows the delta
+    // until the gesture settles and the region is re-rendered sharp
+    const k = view.z / roi.baked.z;
+    const tx = view.x - k * roi.baked.x;
+    const ty = view.y - k * roi.baked.y;
+    c.style.transform = (Math.abs(k-1) < 1e-4 && Math.abs(tx) < .5 && Math.abs(ty) < .5)
+      ? '' : `translate(${tx}px,${ty}px) scale(${k})`;
+  } else {
+    c.style.transform = (view.z === 1) ? '' : `translate(${view.x}px,${view.y}px) scale(${view.z})`;
+  }
   if (!inCropMode()) c.style.cursor = view.z > 1 ? 'grab' : 'default';
   scheduleZoomResize();
 }
 
-function resetView() { view.z = 1; view.x = 0; view.y = 0; applyView(); }
+function resetView() {
+  view.z = 1; view.x = 0; view.y = 0;
+  clearTimeout(zoomResizeTimer);
+  if (roi.active) exitRoi();
+  else applyView();
+}
 
 function clampViewPan() {
-  const c = document.getElementById('main-canvas');
-  const maxX = c.clientWidth  * (view.z - 1) / 2;
-  const maxY = c.clientHeight * (view.z - 1) / 2;
+  if (!cropCanvas) return;
+  const {cssW, cssH} = fittedCssSize();
+  const maxX = cssW * (view.z - 1) / 2;
+  const maxY = cssH * (view.z - 1) / 2;
   view.x = Math.max(-maxX, Math.min(maxX, view.x));
   view.y = Math.max(-maxY, Math.min(maxY, view.y));
 }
@@ -2116,7 +2345,7 @@ function zoomAt(clientX, clientY, factor) {
   const ox = clientX - (ar.left + ar.width/2);
   const oy = clientY - (ar.top  + ar.height/2);
   const z0 = view.z;
-  const z  = Math.max(1, Math.min(8, z0 * factor));
+  const z  = Math.max(1, Math.min(MAX_ZOOM, z0 * factor));
   const ux = (ox - view.x) / z0, uy = (oy - view.y) / z0;
   view.z = z;
   view.x = ox - ux * z;
@@ -2317,15 +2546,26 @@ async function loadFile(file) {
   overlay.classList.remove('hidden');
   msg.style.color = '';
   msg.textContent = 'Loading…';
-  let img, blob;
+  let img, blob, kind = 'preview';
   const info = {};
+  let buf = null;
   try {
-    const buf = await file.arrayBuffer();
+    buf = await file.arrayBuffer();
     const candidates = extractJPEGs(buf, info);
     ({img, blob} = await loadBestJPEG(candidates.length ? candidates : [buf]));
   } catch(err) {
+    // a RAW with no usable embedded preview: develop it up front instead
+    if (buf && isRawName(file.name)) {
+      msg.textContent = 'Developing RAW…';
+      try {
+        img = await decodeRawToCanvas(buf);
+        kind = 'raw';
+      } catch(e2) {
+        console.warn('RAW develop failed:', e2);
+      }
+    }
     // fallback: treat as JPEG/PNG directly
-    try {
+    if (!img) try {
       img = await new Promise((res,rej) => {
         const url = URL.createObjectURL(file);
         const im = new Image();
@@ -2334,16 +2574,24 @@ async function loadFile(file) {
         im.src = url;
       });
       blob = file;
+      kind = 'image';
     } catch(e2) {
       msg.style.color = 'var(--danger)';
       msg.textContent = `Failed to load: ${err.message}`;
       return;
     }
   }
+  if (!isRawName(file.name)) kind = 'image';   // a plain JPEG/PNG is the real pixels
   beginSession(img, blob, {
     name: file.name, size: file.size, lastModified: file.lastModified,
-    rawW: info.rawW || 0, rawH: info.rawH || 0,
-  });
+    rawW: kind === 'raw' ? srcW(img) : (info.rawW || 0),
+    rawH: kind === 'raw' ? srcH(img) : (info.rawH || 0),
+  }, kind);
+
+  // the embedded preview is on screen — develop the actual sensor data behind it
+  if (buf && kind === 'preview') developRaw(buf);
+  // a RAW developed up front has no embedded preview to store — render one
+  if (kind === 'raw' && !sourceBlob) upgradeStoredPreview();
 
   // an edit file opened before its photo was available applies now
   if (pendingDoc) {
@@ -2356,9 +2604,146 @@ async function loadFile(file) {
   await offerSavedEdits();
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Full RAW development (LibRaw compiled to WebAssembly)
+//
+// The embedded preview opens instantly, but for a modern camera it is a
+// fraction of the sensor (a 24MP A7C embeds a 1616×1080 preview). LibRaw
+// decodes the actual mosaic — demosaic, camera white balance, sRGB — in a
+// worker, and the result replaces the preview once it is ready. All edits
+// carry over: geometry is replayed from the op log, sliders are resolution-
+// independent.
+// ─────────────────────────────────────────────────────────────────────────────
+const RAW_NAME_RE = /\.(arw|dng|cr2|nef|raf)$/i;
+const isRawName = n => RAW_NAME_RE.test(n || '');
+
+let librawLoader = null;
+function loadLibRaw() {
+  if (!librawLoader) {
+    librawLoader = import('./vendor/libraw/index.js').then(m => m.default)
+      .catch(err => { librawLoader = null; throw err; });
+  }
+  return librawLoader;
+}
+
+let developNote = '';
+function setDevelopNote(txt) { developNote = txt; refreshLibraryStatus(); }
+
+function rawToCanvas(img) {
+  const c = document.createElement('canvas');
+  c.width = img.width; c.height = img.height;
+  const ctx = c.getContext('2d');
+  const id = ctx.createImageData(img.width, img.height);
+  const s = img.data, d = id.data, n = img.width * img.height;
+  const shift = img.bits === 16 ? 8 : 0;
+  if (img.colors === 3) {
+    for (let i = 0, j = 0; i < n; i++) {
+      d[i*4]   = s[j++] >> shift;
+      d[i*4+1] = s[j++] >> shift;
+      d[i*4+2] = s[j++] >> shift;
+      d[i*4+3] = 255;
+    }
+  } else if (img.colors === 1) {
+    for (let i = 0; i < n; i++) {
+      const v = s[i] >> shift;
+      d[i*4] = v; d[i*4+1] = v; d[i*4+2] = v; d[i*4+3] = 255;
+    }
+  } else {
+    throw new Error('unexpected channel count: ' + img.colors);
+  }
+  ctx.putImageData(id, 0, 0);
+  return c;
+}
+
+// decode a RAW buffer to an RGB canvas — demosaic, camera WB, sRGB
+async function decodeRawToCanvas(buf) {
+  const LibRaw = await loadLibRaw();
+  const raw = new LibRaw();
+  try {
+    // a half-size decode still beats the embedded preview by a wide margin,
+    // and keeps memory in bounds on small devices
+    const half = (navigator.deviceMemory || 8) <= 4;
+    await raw.open(new Uint8Array(buf), {
+      useCameraWb: true, outputBps: 8, userQual: 3, outputColor: 1, halfSize: half,
+    });
+    const img = await raw.imageData();
+    if (!img || !img.data || !img.width) throw new Error('empty decode');
+    return rawToCanvas(img);
+  } finally {
+    raw.dispose();
+  }
+}
+
+let developSeq = 0;
+async function developRaw(buf) {
+  if (!sourceImg) return;
+  const seq = ++developSeq;
+  const forProject = currentProject?.id;
+  setDevelopNote('Developing the full RAW in the background…');
+  try {
+    const full = await decodeRawToCanvas(buf);
+    // the user may have moved on to another photo while this decoded
+    if (seq !== developSeq || currentProject?.id !== forProject || !sourceImg) return;
+    setDevelopNote('');
+    if (full.width * full.height <= srcW(sourceImg) * srcH(sourceImg)) {
+      return;   // preview is already the best there is
+    }
+    swapSource(full);
+    toast(`Developed from RAW — ${full.width} × ${full.height} (${megapixels(full.width, full.height)})`);
+  } catch (err) {
+    console.warn('RAW develop failed, staying on the embedded preview:', err);
+    if (seq === developSeq) setDevelopNote('');
+  }
+}
+
+// After a develop, the stored per-project preview would still be the small
+// embedded JPEG. Replace it with a good-sized rendition of the developed
+// image so a saved project reopens at real quality in a later session.
+const STORED_PREVIEW_EDGE = 3072;
+async function upgradeStoredPreview() {
+  if (sourceKind !== 'raw' || !sourceImg) return;
+  const ref = sourceImg;
+  const w = srcW(ref), h = srcH(ref);
+  const s = Math.min(1, STORED_PREVIEW_EDGE / Math.max(w, h));
+  const c = s < 1 ? downscaleHQ(ref, Math.max(1, Math.round(w*s)), Math.max(1, Math.round(h*s))) : ref;
+  const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.88));
+  if (blob && sourceImg === ref) {
+    sourceBlob = blob;
+    scheduleAutosave();
+  }
+}
+
+// Replace the source pixels under the current edit. Geometry is replayed from
+// the op log, so crops/rotations land on the same part of the picture.
+function swapSource(canvas) {
+  sourceImg = canvas;
+  sourceKind = 'raw';
+  if (sourceMeta) { sourceMeta.rawW = canvas.width; sourceMeta.rawH = canvas.height; }
+  // history snapshots hold preview-resolution canvases — drop the references so
+  // a restore replays the geometry against the developed image instead
+  for (const h of history) h.snap.baseCanvas = null;
+  const straighten = state.straighten;
+  applyGeomOps();
+  state.straighten = straighten;
+  buildCropCanvas();
+  if (gl) {
+    buildPreviewCanvas();
+    uploadTexture(previewCanvas);
+    roi.active = false;   // its rect refers to the old working canvas
+    fitCanvas();
+    clampViewPan();
+    if (view.z > 1.001) enterRoi();
+    else applyView();
+    scheduleRender();
+  }
+  refreshLibraryStatus();
+  scheduleAutosave();
+  upgradeStoredPreview();
+}
+
 // shared setup for a freshly decoded photo, whether it came from a picked file
 // or from the preview stored inside a saved project
-function beginSession(img, blob, meta) {
+function beginSession(img, blob, meta, kind = 'preview') {
   // every entry point lands here, so the drop overlay is dismissed here too —
   // a saved project reopened on a fresh page has no picked file to do it
   const msg = document.getElementById('drop-msg');
@@ -2366,7 +2751,10 @@ function beginSession(img, blob, meta) {
   msg.textContent = 'Drop a RAW file here';
   document.getElementById('drop-overlay').classList.add('hidden');
 
+  developSeq++;        // invalidate any decode still running for the old photo
+  developNote = '';
   sourceImg = img;
+  sourceKind = kind;
   sourceBlob = blob || null;
   sourceMeta = meta || {name:'photo'};
   currentProject = {id: projectId(sourceMeta), driveFileId: null};
@@ -2401,9 +2789,10 @@ function beginSession(img, blob, meta) {
   buildCropCanvas();
 
   uploadLUT(buildCurveLUT(state.curvePoints));
-  uploadTexture(cropCanvas);
-  fitCanvas();
+  buildPreviewCanvas();
+  uploadTexture(previewCanvas);
   resetView();
+  fitCanvas();
   scheduleRender();
   buildPresetThumbs();
   switchPanel('edit');
@@ -2524,16 +2913,14 @@ const idbAlbumDel = id  => idbRun('readwrite', s => s.delete(id), DB_ALBUMS);
 const THUMB_MAX = 320;
 function thumbFrom(src, w, h) {
   const s = Math.min(THUMB_MAX / w, THUMB_MAX / h, 1);
-  const c = document.createElement('canvas');
-  c.width  = Math.max(1, Math.round(w * s));
-  c.height = Math.max(1, Math.round(h * s));
-  c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+  const c = downscaleHQ(src, Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)));
   try { return c.toDataURL('image/jpeg', 0.7); } catch(e) { return null; }
 }
 
 function makeThumb() {
   if (!cropCanvas) return null;
-  return thumbFrom(cropCanvas, cropCanvas.width, cropCanvas.height);
+  const src = previewCanvas || cropCanvas;
+  return thumbFrom(src, src.width, src.height);
 }
 
 async function saveToDevice(quiet) {
@@ -2548,7 +2935,7 @@ async function saveToDevice(quiet) {
       doc: buildDoc(),
       preview: sourceBlob || null,
       thumb: makeThumb(),
-      w: sourceImg.naturalWidth, h: sourceImg.naturalHeight,
+      w: srcW(sourceImg), h: srcH(sourceImg),
       driveFileId: currentProject.driveFileId || prev?.driveFileId || null,
       albums: prev?.albums || [],
     });
@@ -2591,7 +2978,8 @@ async function openProject(id) {
   if (rec.preview) {
     const img = await blobToImage(rec.preview).catch(() => null);
     if (!img) { toast('Saved photo could not be decoded'); return; }
-    beginSession(img, rec.preview, rec.doc.source);
+    beginSession(img, rec.preview, rec.doc.source,
+                 isRawName(rec.doc.source?.name) ? 'preview' : 'image');
     currentProject.driveFileId = rec.driveFileId || null;
     applyEditDoc(rec.doc);
     toast((rec.doc.history || []).length ? `Continuing ${rec.name}` : rec.name);
@@ -2675,7 +3063,7 @@ async function openEditDoc(doc) {
     const blob = dataURLToBlob(doc.image);
     const img = await blobToImage(blob).catch(() => null);
     if (!img) { toast('The photo inside that file could not be decoded'); return; }
-    beginSession(img, blob, doc.source);
+    beginSession(img, blob, doc.source, isRawName(doc.source?.name) ? 'preview' : 'image');
     applyEditDoc(doc);
     toast(`Continuing ${doc.source?.name || 'saved edit'}`);
   } else if (sourceImg && projectId(sourceMeta) === projectId(doc.source || {})) {
@@ -2841,10 +3229,12 @@ function wireDriveSetupLink() {
 // ── Saved-edits panel ───────────────────────────────────────────────────────
 const megapixels = (w, h) => (w * h / 1e6).toFixed(1) + ' MP';
 
-// What the editor is actually working from: the preview embedded in the RAW,
-// not the sensor image. Worth stating plainly — it sets the detail ceiling.
-function describeSource(w, h, rawW, rawH) {
+// What the editor is actually working from — it sets the detail ceiling, so
+// state it plainly: the developed sensor image, or just the embedded preview.
+function describeSource(w, h, rawW, rawH, kind) {
   if (!w || !h) return '';
+  if (kind === 'raw')   return `Developed from RAW · ${w} × ${h} (${megapixels(w, h)})`;
+  if (kind === 'image') return `${w} × ${h} (${megapixels(w, h)})`;
   let s = `Editing the embedded preview · ${w} × ${h} (${megapixels(w, h)})`;
   if (rawW && rawH && rawW * rawH > w * h * 1.1)
     s += ` · RAW is ${rawW} × ${rawH} (${megapixels(rawW, rawH)})`;
@@ -2864,8 +3254,12 @@ function refreshLibraryStatus() {
   const n = history.length;
   el.textContent = `${sourceMeta?.name || 'photo'} · ${n} ${n === 1 ? 'edit' : 'edits'}` +
     (when ? ` · saved ${when}` : ' · not saved yet');
-  if (src) src.textContent = describeSource(
-    sourceImg.naturalWidth, sourceImg.naturalHeight, sourceMeta?.rawW, sourceMeta?.rawH);
+  if (src) {
+    let txt = describeSource(srcW(sourceImg), srcH(sourceImg),
+                             sourceMeta?.rawW, sourceMeta?.rawH, sourceKind);
+    if (developNote) txt += (txt ? ' · ' : '') + developNote;
+    src.textContent = txt;
+  }
 }
 
 async function renderLibraryList() {
@@ -3458,79 +3852,116 @@ function downloadBlob(blob, name) {
   setTimeout(() => URL.revokeObjectURL(a.href), 30000);
 }
 
+function exportName(ext) {
+  const base = (sourceMeta?.name || 'safelight').replace(/\.[^.]+$/, '');
+  return `${base}-edit.${ext}`;
+}
+
 function exportImage(format = 'jpeg', maxEdge = 0, quality = 92) {
   if (!cropCanvas || !gl) return;
+  toast('Exporting…', null, null, 60000);
+  // let the toast paint before the synchronous render work starts
+  setTimeout(() => {
+    try { exportImageNow(format, maxEdge, quality); }
+    catch (err) { console.warn('Export failed', err); toast('Export failed — try a smaller size'); }
+  }, 30);
+}
+
+// Renders the edit at the working image's own resolution. The output routinely
+// exceeds the GPU's texture/renderbuffer limits, so it is rendered in tiles and
+// stitched. Each tile is padded past the sharpen/clarity sampling neighborhood
+// so the seams cannot show.
+function exportImageNow(format, maxEdge, quality) {
   const iw = cropCanvas.width, ih = cropCanvas.height;
   const scale = maxEdge ? Math.min(1, maxEdge/Math.max(iw,ih)) : 1;
   const ew = Math.max(1, Math.round(iw*scale)), eh = Math.max(1, Math.round(ih*scale));
 
-  // downscale the source first (better filtering than GPU minification)
-  let src = cropCanvas;
-  if (scale < 1) {
-    const sc = document.createElement('canvas');
-    sc.width = ew; sc.height = eh;
-    sc.getContext('2d').drawImage(cropCanvas, 0, 0, ew, eh);
-    src = sc;
-  }
+  // downscale first when a smaller size was asked for — stepped 2D downscaling
+  // filters far better than GPU minification
+  const src = scale < 1 ? downscaleHQ(cropCanvas, ew, eh) : cropCanvas;
 
-  // render to FBO — keep unit 0 for textures we create here; unit 1 must stay
-  // bound to the curve LUT or the shader samples its own render target
+  const PAD = 8;
+  const maxT = Math.min(maxTexSize(), gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || maxTexSize());
+  const TILE = Math.max(256, Math.min(2048, maxT - 2*PAD));
+  const out = new Uint8ClampedArray(ew * eh * 4);
+
+  // keep unit 0 for the tiles; unit 1 must stay bound to the curve LUT or the
+  // shader samples its own render target
   const fbo = gl.createFramebuffer();
   const rTex = gl.createTexture();
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, rTex);
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,ew,eh,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,rTex,0);
-
-  // upload the (possibly downscaled) source on unit 0
-  const bigTex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, bigTex);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,src);
-
-  // make sure the curve LUT is on unit 1
+  const srcTex = gl.createTexture();
   gl.activeTexture(gl.TEXTURE1);
   gl.bindTexture(gl.TEXTURE_2D, texLUT);
   gl.activeTexture(gl.TEXTURE0);
+  for (const t of [rTex, srcTex]) {
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 
-  gl.viewport(0,0,ew,eh);
-  gl.uniform2f(gl.getUniformLocation(glProgram,'u_texSize'),ew,eh);
-  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+  const loc = n => gl.getUniformLocation(glProgram, n);
+  setAdjustUniforms();
+  gl.uniform1f(loc('u_time'), 0);           // stable grain in exports
+  gl.uniform4f(loc('u_quad'), 0, 0, 1, 1);
 
-  // read pixels
-  const pixels = new Uint8Array(ew*eh*4);
-  gl.readPixels(0,0,ew,eh,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+  const tileCanvas = document.createElement('canvas');
+  const tctx = tileCanvas.getContext('2d');
 
-  // restore
-  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
-  gl.deleteFramebuffer(fbo);
-  gl.deleteTexture(rTex);
-  gl.deleteTexture(bigTex);
-  uploadTexture(cropCanvas);
-  fitCanvas();
-  scheduleRender();
+  for (let ty = 0; ty < eh; ty += TILE) {
+    for (let tx = 0; tx < ew; tx += TILE) {
+      const w0 = Math.min(TILE, ew - tx), h0 = Math.min(TILE, eh - ty);
+      const px0 = Math.max(0, tx - PAD),  py0 = Math.max(0, ty - PAD);
+      const px1 = Math.min(ew, tx + w0 + PAD), py1 = Math.min(eh, ty + h0 + PAD);
+      const pw = px1 - px0, ph = py1 - py0;
 
-  // flip Y (WebGL reads bottom-up)
-  const flipped = new Uint8ClampedArray(ew*eh*4);
-  for(let y=0;y<eh;y++){
-    const src=(eh-1-y)*ew*4, dst=y*ew*4;
-    flipped.set(pixels.subarray(src,src+ew*4),dst);
+      tileCanvas.width = pw; tileCanvas.height = ph;
+      tctx.drawImage(src, px0, py0, pw, ph, 0, 0, pw, ph);
+      gl.bindTexture(gl.TEXTURE_2D, srcTex);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,tileCanvas);
+
+      gl.bindTexture(gl.TEXTURE_2D, rTex);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,pw,ph,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,rTex,0);
+      gl.bindTexture(gl.TEXTURE_2D, srcTex);
+
+      gl.viewport(0, 0, pw, ph);
+      gl.uniform2f(loc('u_texSize'), pw, ph);
+      gl.uniform2f(loc('u_uvOff'),   px0/ew, py0/eh);
+      gl.uniform2f(loc('u_uvScale'), pw/ew,  ph/eh);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+      const pixels = new Uint8Array(pw * ph * 4);
+      gl.readPixels(0, 0, pw, ph, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      // stitch the unpadded interior into the output, flipping GL's bottom-up rows
+      for (let j = 0; j < h0; j++) {
+        const r = py1 - 1 - (ty + j);
+        const srcOff = (r * pw + (tx - px0)) * 4;
+        out.set(pixels.subarray(srcOff, srcOff + w0*4), ((ty + j) * ew + tx) * 4);
+      }
+    }
   }
 
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.deleteFramebuffer(fbo);
+  gl.deleteTexture(rTex);
+  gl.deleteTexture(srcTex);
+  scheduleRender();   // rebinds the interactive view's texture and uniforms
+
   if (format === 'tiff') {
-    downloadBlob(new Blob([encodeTIFF(flipped, ew, eh)], {type:'image/tiff'}), 'safelight-edit.tif');
+    downloadBlob(new Blob([encodeTIFF(out, ew, eh)], {type:'image/tiff'}), exportName('tif'));
+    toast(`Exported TIFF · ${ew} × ${eh}`);
     return;
   }
   const outCanvas = document.createElement('canvas');
-  outCanvas.width=ew; outCanvas.height=eh;
-  outCanvas.getContext('2d').putImageData(new ImageData(flipped,ew,eh),0,0);
-  outCanvas.toBlob(blob => downloadBlob(blob, 'safelight-edit.jpg'), 'image/jpeg', quality/100);
+  outCanvas.width = ew; outCanvas.height = eh;
+  outCanvas.getContext('2d').putImageData(new ImageData(out, ew, eh), 0, 0);
+  outCanvas.toBlob(blob => {
+    downloadBlob(blob, exportName('jpg'));
+    toast(`Exported JPEG · ${ew} × ${eh}`);
+  }, 'image/jpeg', quality/100);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3869,7 +4300,7 @@ function init() {
       const cx = (a.clientX+b.clientX)/2, cy = (a.clientY+b.clientY)/2;
       const ox  = cx - (ar.left + ar.width/2),       oy  = cy - (ar.top + ar.height/2);
       const ox0 = pinch.cx - (ar.left + ar.width/2), oy0 = pinch.cy - (ar.top + ar.height/2);
-      const z = Math.max(1, Math.min(8, pinch.z * Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY) / pinch.d));
+      const z = Math.max(1, Math.min(MAX_ZOOM, pinch.z * Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY) / pinch.d));
       const ux = (ox0 - pinch.x) / pinch.z, uy = (oy0 - pinch.y) / pinch.z;
       view.z = z;
       view.x = ox - ux * z;
@@ -3916,7 +4347,10 @@ function init() {
   });
 
   // Resize
-  window.addEventListener('resize', () => { fitCanvas(); scheduleRender(); });
+  window.addEventListener('resize', () => {
+    if (roi.active) enterRoi();
+    else { fitCanvas(); scheduleRender(); }
+  });
 
   // Initial curve draw
   drawCurve();
