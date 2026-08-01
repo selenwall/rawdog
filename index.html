@@ -1083,6 +1083,10 @@ function initGL(canvas) {
   gl.vertexAttribPointer(aUV,  2, gl.FLOAT, false, 16, 8);
 
   gl.useProgram(glProgram);
+  // sane sampler bindings from the start, for any draw that happens before the
+  // first render() sets them
+  gl.uniform1i(gl.getUniformLocation(glProgram, 'u_tex'), 0);
+  gl.uniform1i(gl.getUniformLocation(glProgram, 'u_curve_lut'), 1);
 }
 
 function uploadTexture(img) {
@@ -3078,7 +3082,9 @@ function thumbFrom(src, w, h) {
 // Sliders are applied by the shader at draw time, so a working canvas on its own
 // is still the untouched image — thumbnails go through the same pipeline the
 // editor and the exporter use, just at thumbnail size.
-const THUMB_VERSION = 2;   // 1: source pixels · 2: rendered with the edit applied
+// 1: source pixels · 2: rendered with the edit applied · 3: with the samplers
+// bound, which v2 could get wrong on a cold start and bake into the thumbnail
+const THUMB_VERSION = 3;
 
 function thumbWithEdit(srcCanvas, st, curvePoints) {
   const s = Math.min(THUMB_MAX / srcCanvas.width, THUMB_MAX / srcCanvas.height, 1);
@@ -4343,6 +4349,11 @@ function renderEdit(srcCanvas, st, curvePoints, maxEdge) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 
   const loc = n => gl.getUniformLocation(glProgram, n);
+  // Bind the samplers here rather than inheriting them: this runs before the
+  // first render() when the grid refreshes thumbnails on a cold start, and an
+  // unset u_curve_lut samples unit 0 — the photo — as its own tone curve.
+  gl.uniform1i(loc('u_tex'), 0);
+  gl.uniform1i(loc('u_curve_lut'), 1);
   setAdjustUniforms(st);
   gl.uniform1f(loc('u_time'), 0);           // stable grain in exports
   gl.uniform4f(loc('u_quad'), 0, 0, 1, 1);
