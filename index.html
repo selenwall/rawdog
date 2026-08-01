@@ -2587,6 +2587,9 @@ async function loadFile(file) {
     rawW: kind === 'raw' ? srcW(img) : (info.rawW || 0),
     rawH: kind === 'raw' ? srcH(img) : (info.rawH || 0),
   }, kind);
+  // keep the original bytes around: if this photo is (or gets) filed in an
+  // album, the RAW is stored with it so it redevelops at full quality later
+  if (isRawName(file.name)) sourceRawBlob = file;
 
   // the embedded preview is on screen — develop the actual sensor data behind it
   if (buf && kind === 'preview') developRaw(buf);
@@ -2685,9 +2688,11 @@ async function developRaw(buf) {
     // the user may have moved on to another photo while this decoded
     if (seq !== developSeq || currentProject?.id !== forProject || !sourceImg) return;
     setDevelopNote('');
-    if (full.width * full.height <= srcW(sourceImg) * srcH(sourceImg)) {
-      return;   // preview is already the best there is
-    }
+    // keep the decode unless the current pixels already match or beat it —
+    // at equal size it still wins over a stored JPEG rendition
+    const cur = srcW(sourceImg) * srcH(sourceImg);
+    const dec = full.width * full.height;
+    if (dec < cur || (dec === cur && sourceKind === 'raw')) return;
     swapSource(full);
     toast(`Developed from RAW — ${full.width} × ${full.height} (${megapixels(full.width, full.height)})`);
   } catch (err) {
@@ -2756,6 +2761,7 @@ function beginSession(img, blob, meta, kind = 'preview') {
   sourceImg = img;
   sourceKind = kind;
   sourceBlob = blob || null;
+  sourceRawBlob = null;
   sourceMeta = meta || {name:'photo'};
   currentProject = {id: projectId(sourceMeta), driveFileId: null};
   lastSavedAt = 0;
@@ -2815,6 +2821,7 @@ const DOC_FORMAT = 'safelight-edit';
 const DOC_VERSION = 1;
 
 let sourceBlob = null;     // decoded preview JPEG, kept for saving
+let sourceRawBlob = null;  // the original RAW file, kept for album photos
 let sourceMeta = null;     // {name,size,lastModified}
 let currentProject = null; // {id, driveFileId}
 let pendingDoc = null;     // edit opened before its photo was available
@@ -2927,6 +2934,7 @@ async function saveToDevice(quiet) {
   if (!sourceImg || !currentProject) return false;
   try {
     const prev = await idbGet(currentProject.id).catch(() => null);
+    const albums = prev?.albums || [];
     await idbPut({
       id: currentProject.id,
       name: sourceMeta?.name || 'photo',
@@ -2934,10 +2942,13 @@ async function saveToDevice(quiet) {
       edits: history.length,
       doc: buildDoc(),
       preview: sourceBlob || null,
+      // album photos keep the original RAW so they redevelop at full quality;
+      // loose ones don't — a card's worth of 24MB files would sink the quota
+      raw: albums.length ? (sourceRawBlob || prev?.raw || null) : null,
       thumb: makeThumb(),
       w: srcW(sourceImg), h: srcH(sourceImg),
       driveFileId: currentProject.driveFileId || prev?.driveFileId || null,
-      albums: prev?.albums || [],
+      albums,
     });
     await pruneProjects();
     lastSavedAt = Date.now();
@@ -2982,6 +2993,11 @@ async function openProject(id) {
                  isRawName(rec.doc.source?.name) ? 'preview' : 'image');
     currentProject.driveFileId = rec.driveFileId || null;
     applyEditDoc(rec.doc);
+    // album photos carry their original RAW — develop it behind the preview
+    if (rec.raw) {
+      sourceRawBlob = rec.raw;
+      rec.raw.arrayBuffer().then(b => developRaw(b)).catch(() => {});
+    }
     toast((rec.doc.history || []).length ? `Continuing ${rec.name}` : rec.name);
   } else {
     pendingDoc = rec.doc;
@@ -3341,6 +3357,17 @@ async function decodeForImport(file) {
     const candidates = extractJPEGs(buf, info);
     return {...await loadBestJPEG(candidates.length ? candidates : [buf]), info};
   } catch(err) {
+    // a RAW with no usable embedded preview: develop it and store a rendition
+    if (isRawName(file.name)) try {
+      const c = await decodeRawToCanvas(await file.arrayBuffer());
+      const s = Math.min(1, STORED_PREVIEW_EDGE / Math.max(c.width, c.height));
+      const small = s < 1
+        ? downscaleHQ(c, Math.max(1, Math.round(c.width*s)), Math.max(1, Math.round(c.height*s)))
+        : c;
+      const blob = await new Promise(res => small.toBlob(res, 'image/jpeg', 0.88));
+      info.rawW = c.width; info.rawH = c.height;
+      return {img: c, blob, info};
+    } catch(e2) { /* fall through to the plain-image attempt */ }
     return {img: await blobToImage(file), blob: file, info};
   }
 }
@@ -3376,7 +3403,11 @@ async function importFiles(files) {
       const prev = await idbGet(id).catch(() => null);
       if (prev) {
         prev.albums = prev.albums || [];
-        if (album && !prev.albums.includes(album)) { prev.albums.push(album); await idbPut(prev); }
+        let dirty = false;
+        if (album && !prev.albums.includes(album)) { prev.albums.push(album); dirty = true; }
+        // the original file is in hand — attach it if the photo is album-kept
+        if (prev.albums.length && !prev.raw && isRawName(f.name)) { prev.raw = f; dirty = true; }
+        if (dirty) await idbPut(prev);
       } else {
         const {img, blob, info} = await decodeForImport(f);
         meta.rawW = info.rawW || 0;
@@ -3384,8 +3415,9 @@ async function importFiles(files) {
         await idbPut({
           id, name: f.name, savedAt: Date.now(), edits: 0,
           doc: blankDoc(meta), preview: blob || null,
-          thumb: thumbFrom(img, img.naturalWidth, img.naturalHeight),
-          w: img.naturalWidth, h: img.naturalHeight,
+          raw: (album && isRawName(f.name)) ? f : null,
+          thumb: thumbFrom(img, srcW(img), srcH(img)),
+          w: srcW(img), h: srcH(img),
           driveFileId: null, albums: album ? [album] : [],
         });
       }
@@ -3445,6 +3477,7 @@ async function deleteAlbum(id) {
   if (!confirm(`Delete the album “${album.name}”? The photos stay in your library.`)) return;
   for (const p of pg.photos.filter(p => (p.albums || []).includes(id))) {
     p.albums = p.albums.filter(a => a !== id);
+    if (!p.albums.length && p.raw) p.raw = null;   // RAW rides with album membership
     await idbPut(p);
   }
   pg.albums = pg.albums.filter(a => a.id !== id);
@@ -3459,7 +3492,13 @@ async function addToAlbum(ids, album) {
     const p = pg.photos.find(x => x.id === id);
     if (!p) continue;
     p.albums = p.albums || [];
-    if (!p.albums.includes(album)) { p.albums.push(album); await idbPut(p); }
+    if (!p.albums.includes(album)) {
+      p.albums.push(album);
+      // filing the open photo into an album: its original RAW is still in
+      // memory, so store it alongside for full-quality redevelops
+      if (!p.raw && sourceRawBlob && currentProject?.id === id) p.raw = sourceRawBlob;
+      await idbPut(p);
+    }
   }
   pg.selection.clear();
   renderPhotos();
@@ -3470,6 +3509,7 @@ async function removeFromAlbum(ids, album) {
     const p = pg.photos.find(x => x.id === id);
     if (!p || !p.albums) continue;
     p.albums = p.albums.filter(a => a !== album);
+    if (!p.albums.length && p.raw) p.raw = null;   // RAW rides with album membership
     await idbPut(p);
   }
   pg.selection.clear();
@@ -3608,10 +3648,13 @@ function renderPhotoGrid() {
     check.addEventListener('click', e => { e.stopPropagation(); togglePhoto(p.id); });
     tile.appendChild(check);
 
-    if ((p.doc && (p.doc.history || []).length) || p.edits) {
+    const flags = [];
+    if (p.raw) flags.push('RAW');
+    if ((p.doc && (p.doc.history || []).length) || p.edits) flags.push('Edited');
+    if (flags.length) {
       const badge = document.createElement('div');
       badge.className = 'tile-badge';
-      badge.textContent = 'Edited';
+      badge.textContent = flags.join(' · ');
       tile.appendChild(badge);
     }
 
