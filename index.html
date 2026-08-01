@@ -3074,10 +3074,74 @@ function thumbFrom(src, w, h) {
   try { return c.toDataURL('image/jpeg', 0.7); } catch(e) { return null; }
 }
 
+// The grid should show each photo as it looks now, not as it came off the card.
+// Sliders are applied by the shader at draw time, so a working canvas on its own
+// is still the untouched image — thumbnails go through the same pipeline the
+// editor and the exporter use, just at thumbnail size.
+const THUMB_VERSION = 2;   // 1: source pixels · 2: rendered with the edit applied
+
+function thumbWithEdit(srcCanvas, st, curvePoints) {
+  const s = Math.min(THUMB_MAX / srcCanvas.width, THUMB_MAX / srcCanvas.height, 1);
+  const small = s < 1
+    ? downscaleHQ(srcCanvas, Math.max(1, Math.round(srcCanvas.width  * s)),
+                             Math.max(1, Math.round(srcCanvas.height * s)))
+    : srcCanvas;
+  if (!gl) return thumbFrom(small, small.width, small.height);
+  try {
+    const out = renderEdit(small, st, curvePoints, 0);
+    const c = document.createElement('canvas');
+    c.width = out.w; c.height = out.h;
+    c.getContext('2d').putImageData(new ImageData(out.pixels, out.w, out.h), 0, 0);
+    return c.toDataURL('image/jpeg', 0.7);
+  } catch(err) {
+    return thumbFrom(small, small.width, small.height);   // fall back to the plain image
+  }
+}
+
 function makeThumb() {
   if (!cropCanvas) return null;
-  const src = previewCanvas || cropCanvas;
-  return thumbFrom(src, src.width, src.height);
+  try {
+    return thumbWithEdit(previewCanvas || cropCanvas, state, state.curvePoints);
+  } finally {
+    // hand the interactive view its own curve back and repaint
+    if (gl) { uploadLUT(buildCurveLUT(state.curvePoints)); scheduleRender(); }
+  }
+}
+
+// Thumbnails stored before edits were rendered into them show the untouched
+// photo. Bring those up to date in the background when the grid is opened,
+// working from the stored preview so it stays quick even for a full album.
+let thumbRefreshRunning = false;
+async function refreshStaleThumbs() {
+  if (thumbRefreshRunning) return;
+  const stale = pg.photos.filter(p =>
+    (p.thumbV || 0) < THUMB_VERSION && (p.doc?.history || []).length);
+  if (!stale.length) return;
+  if (!gl) { initGL(document.getElementById('main-canvas')); if (!gl) return; }
+  thumbRefreshRunning = true;
+  let changed = 0;
+  try {
+    for (const p of stale) {
+      await nextFrame();          // stay out of the way of scrolling
+      try {
+        const rec = await idbGet(p.id);
+        if (!rec?.preview || !rec.doc?.edit) continue;
+        const img  = await decodeUpright(rec.preview, rec.doc.source?.orientation);
+        const edit = rec.doc.edit;
+        const thumb = thumbWithEdit(workingCanvasFor(img, edit),
+                                    stateFromEdit(edit), edit.curvePoints);
+        if (!thumb) continue;
+        rec.thumb = thumb; rec.thumbV = THUMB_VERSION;
+        await idbPut(rec);
+        p.thumb = thumb; p.thumbV = THUMB_VERSION;
+        changed++;
+      } catch(err) { /* a photo that won't decode keeps its old thumbnail */ }
+    }
+  } finally {
+    thumbRefreshRunning = false;
+    if (cropCanvas && gl) { uploadLUT(buildCurveLUT(state.curvePoints)); scheduleRender(); }
+  }
+  if (changed && photosIsOpen()) renderPhotos();
 }
 
 async function saveToDevice(quiet) {
@@ -3098,6 +3162,7 @@ async function saveToDevice(quiet) {
       // files would sink the quota
       raw: keepsRaw(albums) ? (sourceRawBlob || prev?.raw || null) : null,
       thumb: makeThumb(),
+      thumbV: THUMB_VERSION,
       w: srcW(sourceImg), h: srcH(sourceImg),
       driveFileId: currentProject.driveFileId || prev?.driveFileId || null,
       albums,
@@ -3544,7 +3609,9 @@ async function importFiles(files) {
           id, name: f.name, savedAt: Date.now(), edits: 0,
           doc: blankDoc(meta), preview: blob || null,
           raw: (keepsRaw([album]) && isRawName(f.name)) ? f : null,
+          // a fresh import has no edits yet, so the plain image is current
           thumb: thumbFrom(img, srcW(img), srcH(img)),
+          thumbV: THUMB_VERSION,
           w: srcW(img), h: srcH(img),
           driveFileId: null, albums: [album],
         });
@@ -3889,6 +3956,7 @@ async function openPhotos() {
   await loadPhotos();
   document.getElementById('photos-view').classList.add('open');
   renderPhotos();
+  refreshStaleThumbs();
 }
 
 function closePhotos() {
