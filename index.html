@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#daf5ff">
-<title>Safelight — RAW Editor</title>
+<title>Rawdog Photo Editor — by CodepuppyIO</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 /* ── Palette ───────────────────────────────────────────────────────────────
@@ -59,10 +59,49 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
   #histogram-canvas,#histogram-canvas.ready{display:none}
 }
 
+/* ── Brand ─────────────────────────────────────────────────────────────────
+   Rawdog wears the app's own ice/aqua palette; the CodepuppyIO credit borrows
+   the parent brand's warm accent and its split of the wordmark, so the two read
+   as related without the credit shouting over the product name. The IO tag is
+   set in mono, tilted off-axis and squared on one corner like a luggage tag —
+   the one deliberately hand-made note in an otherwise very square interface. */
+:root{
+  --cp-teal:#2c4a52;   /* codepuppy.io ground */
+  --cp-cream:#f8f5ea;  /* its wordmark */
+  --cp-gold:#e8c86a;   /* the IO half of it */
+}
+/* A rounded, chunky sans ties the two names into one family. Only Apple has a
+   rounded system face; elsewhere this lands on the normal UI sans, which is
+   fine — nothing here depends on the rounding. */
+.brand-font{font-family:ui-rounded,"SF Pro Rounded","Hiragino Maru Gothic ProN",system-ui,sans-serif}
+.brandmark{display:flex;align-items:center;gap:12px;user-select:none}
+.brand-paw{width:42px;height:40px;flex-shrink:0;fill:var(--accent-deep);opacity:.92;transform:rotate(-9deg)}
+.brand-title{display:flex;align-items:baseline;gap:9px;font-size:28px;font-weight:800;line-height:1;color:var(--text);letter-spacing:-.025em}
+.brand-kind{font:600 10px/1 system-ui,sans-serif;letter-spacing:.17em;text-transform:uppercase;color:var(--text-dim)}
+.brand-by{display:inline-flex;align-items:center;gap:6px;margin-top:8px;text-decoration:none;font-size:12px;pointer-events:all}
+.brand-by .by{color:var(--text-dim);font-style:italic;letter-spacing:.05em}
+/* The credit is the parent wordmark itself — cream and gold on its own teal —
+   pressed onto the pale UI like a sticker, tilted just off square. */
+.brand-by .cp-mark{display:inline-flex;align-items:baseline;background:var(--cp-teal);
+  border-radius:9px;padding:3px 9px 4px;font-size:13px;font-weight:800;letter-spacing:-.01em;
+  box-shadow:0 1.5px 0 rgba(28,50,56,.4);transform:rotate(-1.6deg);
+  transition:transform .18s cubic-bezier(.34,1.56,.64,1)}
+.brand-by .cp{color:var(--cp-cream)}
+.brand-by .io{color:var(--cp-gold)}
+.brand-by:hover .cp-mark{transform:rotate(1.6deg) scale(1.05)}
+@media(prefers-reduced-motion:reduce){.brand-by .cp-mark{transition:none}}
+
+.brandmark.compact{gap:8px}
+.brandmark.compact .brand-paw{width:22px;height:21px}
+.brandmark.compact .brand-title{font-size:16px;gap:6px}
+.brandmark.compact .brand-kind{display:none}
+.brandmark.compact .brand-by{margin-top:3px;font-size:10px;gap:5px}
+.brandmark.compact .brand-by .cp-mark{font-size:11px;padding:2px 7px 3px;border-radius:7px}
+
 /* ── Drop overlay ── */
-#drop-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--text-dim);pointer-events:none;user-select:none;background:rgba(218,245,255,.9)}
+#drop-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px;text-align:center;color:var(--text-dim);pointer-events:none;user-select:none;background:rgba(218,245,255,.9)}
 #drop-overlay.hidden{display:none}
-#drop-overlay svg{opacity:.45}
+#drop-overlay svg:not(.brand-paw){opacity:.45}
 #drop-overlay p{font-size:15px;color:var(--text)}
 #drop-overlay small{font-size:12px;color:var(--text-dim)}
 #file-input{display:none}
@@ -256,7 +295,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
 .album-sep{height:1px;background:var(--border);margin:6px 2px}
 #pg-new-album{background:none;border:1px dashed var(--border-strong);color:var(--text-dim);padding:7px 8px;border-radius:6px;font-size:11px;cursor:pointer;text-align:left}
 #pg-new-album:hover{color:var(--accent-deep);border-color:var(--accent-deep)}
-#pg-storage{margin-top:auto;padding:8px 4px 2px;font-size:10px;color:var(--text-dim);line-height:1.5}
+#pg-brand{margin-top:auto;padding:10px 4px 0}
+#pg-storage{padding:8px 4px 2px;font-size:10px;color:var(--text-dim);line-height:1.5}
 
 #pg-grid-wrap{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}
 #pg-selbar{display:none;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none;background:var(--panel)}
@@ -294,7 +334,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
   #pg-albums{width:100%;flex-direction:row;align-items:center;overflow-x:auto;overflow-y:hidden;border-right:none;border-bottom:1px solid var(--border);padding:8px;gap:5px;scrollbar-width:none}
   #pg-albums::-webkit-scrollbar{display:none}
   .album-row{white-space:nowrap;border:1px solid var(--border);border-radius:14px;padding:6px 10px}
-  .album-sep,#pg-storage{display:none}
+  .album-sep,#pg-storage,#pg-brand{display:none}
   #pg-new-album{white-space:nowrap;border-radius:14px;padding:6px 10px}
   #pg-grid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px;padding:8px}
 }
@@ -313,7 +353,21 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
     <canvas id="crop-overlay"></canvas>
     <div id="compare-hint">Hold to compare</div>
     <div id="drop-overlay">
-      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      <div class="brandmark">
+        <svg class="brand-paw" viewBox="0 0 34 32" aria-hidden="true">
+          <ellipse cx="7.6" cy="12" rx="3" ry="3.9"/>
+          <ellipse cx="14.2" cy="8.4" rx="3.2" ry="4.2"/>
+          <ellipse cx="21.3" cy="8.4" rx="3.2" ry="4.2"/>
+          <ellipse cx="27.6" cy="12" rx="3" ry="3.9"/>
+          <path d="M17.4 14.6c4.7 0 8.5 3.5 8.5 7.7 0 3.4-2.6 5.4-6 5.4-1.4 0-1.8-.5-2.5-.5s-1.1.5-2.5.5c-3.4 0-6-2-6-5.4 0-4.2 3.8-7.7 8.5-7.7z"/>
+        </svg>
+        <div>
+          <div class="brand-title brand-font">Rawdog<span class="brand-kind">Photo Editor</span></div>
+          <a class="brand-by" href="https://codepuppy.io" target="_blank" rel="noopener noreferrer">
+            <span class="by">by</span><span class="cp-mark brand-font"><span class="cp">Codepuppy</span><span class="io">IO</span></span>
+          </a>
+        </div>
+      </div>
       <p id="drop-msg">Drop RAW files here</p>
       <small>Sony ARW · DNG · CR2 · NEF · RAF — developed at full sensor resolution</small>
       <div style="display:flex;gap:8px;pointer-events:all;align-items:center">
@@ -477,9 +531,22 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
           <div class="lib-btns">
             <button class="lib-btn" id="lib-open-file">Open edit file…</button>
           </div>
+          <div class="brandmark compact">
+            <svg class="brand-paw" viewBox="0 0 34 32" aria-hidden="true">
+              <ellipse cx="7.6" cy="12" rx="3" ry="3.9"/><ellipse cx="14.2" cy="8.4" rx="3.2" ry="4.2"/>
+              <ellipse cx="21.3" cy="8.4" rx="3.2" ry="4.2"/><ellipse cx="27.6" cy="12" rx="3" ry="3.9"/>
+              <path d="M17.4 14.6c4.7 0 8.5 3.5 8.5 7.7 0 3.4-2.6 5.4-6 5.4-1.4 0-1.8-.5-2.5-.5s-1.1.5-2.5.5c-3.4 0-6-2-6-5.4 0-4.2 3.8-7.7 8.5-7.7z"/>
+            </svg>
+            <div>
+              <div class="brand-title brand-font">Rawdog</div>
+              <a class="brand-by" href="https://codepuppy.io" target="_blank" rel="noopener noreferrer">
+                <span class="by">by</span><span class="cp-mark brand-font"><span class="cp">Codepuppy</span><span class="io">IO</span></span>
+              </a>
+            </div>
+          </div>
           <div class="lib-note">Every photo lives in an album, and edits save into it as you work — there is no separate save step. Albums stay in this browser until you delete them or clear its data.</div>
         </div>
-        <input type="file" id="edit-file-input" accept=".json,.safelight,application/json" style="display:none">
+        <input type="file" id="edit-file-input" accept=".json,.rawdog,.safelight,application/json" style="display:none">
       </div>
     </div>
   </div>
@@ -2949,7 +3016,7 @@ function beginSession(img, blob, meta, kind = 'preview') {
   clearHistory();
   refreshLibraryStatus();
 
-  document.title = `Safelight — ${sourceMeta.name}`;
+  document.title = `Rawdog — ${sourceMeta.name}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2961,6 +3028,8 @@ function beginSession(img, blob, meta, kind = 'preview') {
 // later. Three places to keep it — the device (automatic), a downloaded file,
 // and Google Drive — all share the one document format below.
 // ─────────────────────────────────────────────────────────────────────────────
+// Storage identifiers below keep their original spelling on purpose: renaming
+// them would orphan every library and saved edit file already on a device.
 const DOC_FORMAT = 'safelight-edit';
 const DOC_VERSION = 1;
 
@@ -3026,7 +3095,7 @@ function applyEditDoc(doc) {
 // Albums are the whole filing system: every photo belongs to at least one, and
 // an edit is saved into the photo's album record as it is made. There is no
 // separate global save — nothing is stored outside an album.
-const DB_NAME = 'safelight', DB_STORE = 'projects', DB_ALBUMS = 'albums', DB_VERSION = 2;
+const DB_NAME = 'safelight', DB_STORE = 'projects', DB_ALBUMS = 'albums', DB_VERSION = 2;  // see DOC_FORMAT
 let dbPromise = null;
 
 // The inbox every photo lands in until it is filed somewhere deliberate.
@@ -3248,7 +3317,7 @@ async function offerSavedEdits() {
 // ── Edit files ──────────────────────────────────────────────────────────────
 function docFileName() {
   const base = (sourceMeta?.name || 'photo').replace(/\.[^.]+$/, '');
-  return `${base}.safelight.json`;
+  return `${base}.rawdog.json`;
 }
 
 // `embed` writes the decoded preview into the file, so it opens anywhere;
@@ -3315,7 +3384,7 @@ async function openEditDoc(doc) {
 // nothing else in the user's Drive. The client ID belongs to whoever deploys
 // this page, so it is entered once and kept in localStorage.
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
-const DRIVE_KEY = 'safelight.drive.clientId';
+const DRIVE_KEY = 'safelight.drive.clientId';   // renaming would drop a saved client ID
 let driveToken = null, driveTokenClient = null, gisPromise = null;
 
 const driveClientId = () => localStorage.getItem(DRIVE_KEY) || '';
@@ -3371,6 +3440,7 @@ async function driveSave() {
   try {
     const doc = await docWithImage(document.getElementById('lib-embed').checked);
     const body = JSON.stringify(doc);
+    // the appProperties key is what finds this app's existing files in Drive
     const meta = {name: docFileName(), mimeType:'application/json', appProperties:{safelight:'1'}};
     const boundary = 'safelight' + Math.random().toString(36).slice(2);
     const multipart =
@@ -3753,6 +3823,19 @@ function updatePhotosHeader() {
   document.getElementById('pg-close').style.display = sourceImg ? '' : 'none';
 }
 
+const BRAND_HTML = `
+  <svg class="brand-paw" viewBox="0 0 34 32" aria-hidden="true">
+    <ellipse cx="7.6" cy="12" rx="3" ry="3.9"/><ellipse cx="14.2" cy="8.4" rx="3.2" ry="4.2"/>
+    <ellipse cx="21.3" cy="8.4" rx="3.2" ry="4.2"/><ellipse cx="27.6" cy="12" rx="3" ry="3.9"/>
+    <path d="M17.4 14.6c4.7 0 8.5 3.5 8.5 7.7 0 3.4-2.6 5.4-6 5.4-1.4 0-1.8-.5-2.5-.5s-1.1.5-2.5.5c-3.4 0-6-2-6-5.4 0-4.2 3.8-7.7 8.5-7.7z"/>
+  </svg>
+  <div>
+    <div class="brand-title brand-font">Rawdog</div>
+    <a class="brand-by" href="https://codepuppy.io" target="_blank" rel="noopener noreferrer">
+      <span class="by">by</span><span class="cp-mark brand-font"><span class="cp">Codepuppy</span><span class="io">IO</span></span>
+    </a>
+  </div>`;
+
 const ICON_GRID = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>';
 const ICON_ALBUM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
 
@@ -3817,6 +3900,12 @@ function renderAlbumRail() {
   add.textContent = '+ New album';
   add.addEventListener('click', createAlbum);
   wrap.appendChild(add);
+
+  const brand = document.createElement('div');
+  brand.id = 'pg-brand';
+  brand.className = 'brandmark compact';
+  brand.innerHTML = BRAND_HTML;
+  wrap.appendChild(brand);
 
   const storage = document.createElement('div');
   storage.id = 'pg-storage';
@@ -4234,7 +4323,7 @@ async function exportSelection(ids, format, maxEdge, quality) {
 
   if (!entries.length) { toast('Nothing could be exported'); return; }
   try {
-    downloadBlob(makeZip(entries), `safelight-export-${entries.length}.zip`);
+    downloadBlob(makeZip(entries), `rawdog-export-${entries.length}.zip`);
   } catch(err) {
     toast('The export was too large to package — try a smaller size or fewer photos');
     return;
@@ -4408,7 +4497,7 @@ function downloadBlob(blob, name) {
 }
 
 function exportNameFor(sourceName, ext, dup) {
-  const base = (sourceName || 'safelight').replace(/\.[^.]+$/, '');
+  const base = (sourceName || 'rawdog').replace(/\.[^.]+$/, '');
   return `${base}-edit${dup ? '-' + dup : ''}.${ext}`;
 }
 const exportName = ext => exportNameFor(sourceMeta?.name, ext);
