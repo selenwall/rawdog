@@ -138,7 +138,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
 .hist-empty{font-size:11px;color:var(--text-dim);padding:8px 0}
 
 /* ── Export dialog ── */
-#export-menu{position:fixed;display:none;z-index:50;background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--shadow);width:240px;padding:10px}
+#export-menu{position:fixed;display:none;z-index:66;background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--shadow);width:240px;padding:10px}
 #export-menu.open{display:block}
 .exp-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
 .exp-row>span{width:46px;font-size:11px;color:var(--text-dim);flex-shrink:0}
@@ -222,6 +222,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
 #drive-setup ol{margin:0 0 10px 16px;font-size:11px;color:var(--text-dim);line-height:1.6}
 #drive-setup code{background:var(--panel-2);border-radius:3px;padding:0 3px;font-size:10px;word-break:break-all}
 #drive-setup input{width:100%;padding:7px;border:1px solid var(--border);border-radius:5px;background:var(--plate);color:var(--text);font-size:11px;margin-bottom:10px}
+
+/* ── Progress modal (import / batch export) ── */
+#progress-modal{position:fixed;inset:0;z-index:75;display:none;align-items:center;justify-content:center;background:rgba(58,80,90,.35);padding:16px}
+#progress-modal.open{display:flex}
+#progress-modal .dlg{background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--shadow);padding:14px;width:min(100%,380px)}
+#prog-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px}
+#prog-file{font-size:11px;color:var(--text-dim);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-height:15px}
+#prog-bar{height:6px;background:var(--panel-2);border:1px solid var(--border);border-radius:3px;overflow:hidden;margin-bottom:7px}
+#prog-fill{height:100%;width:0;background:var(--accent-deep);border-radius:3px;transition:width .18s}
+#prog-count{font-size:11px;color:var(--text-dim);margin-bottom:10px;font-variant-numeric:tabular-nums}
 
 /* ── Photos: album browser over the saved projects ── */
 #photos-view{position:fixed;inset:0;z-index:50;background:var(--bg);display:none;flex-direction:column}
@@ -441,8 +451,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
           <div class="lib-head">This photo</div>
           <div id="lib-status">No photo open</div>
           <div id="lib-source"></div>
+          <div id="lib-albums" class="lib-note"></div>
           <div class="lib-btns">
-            <button class="lib-btn primary" id="lib-save-device">Save on device</button>
+            <button class="lib-btn primary" id="lib-albums-btn">Albums…</button>
             <button class="lib-btn" id="lib-save-file">Save as file</button>
           </div>
           <label class="lib-check" title="Embeds the decoded preview so the edit file opens without the original RAW">
@@ -462,12 +473,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
         </div>
 
         <div class="lib-section">
-          <div class="lib-head">On this device</div>
+          <div class="lib-head">Edit files</div>
           <div class="lib-btns">
             <button class="lib-btn" id="lib-open-file">Open edit file…</button>
           </div>
-          <div id="lib-list"><div class="lib-empty">Nothing saved yet</div></div>
-          <div class="lib-note">Edits auto-save here as you work, and stay in this browser until you clear its data.</div>
+          <div class="lib-note">Every photo lives in an album, and edits save into it as you work — there is no separate save step. Albums stay in this browser until you delete them or clear its data.</div>
         </div>
         <input type="file" id="edit-file-input" accept=".json,.safelight,application/json" style="display:none">
       </div>
@@ -492,7 +502,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
     <div id="pg-grid-wrap">
       <div id="pg-selbar">
         <span id="pg-selcount">0 selected</span>
-        <button class="sel-btn" id="pg-sel-add">Add to album…</button>
+        <button class="sel-btn" id="pg-sel-export">Export…</button>
+    <button class="sel-btn" id="pg-sel-add">Add to album…</button>
         <button class="sel-btn" id="pg-sel-remove" style="display:none">Remove from album</button>
         <button class="sel-btn danger" id="pg-sel-delete">Delete</button>
         <button class="sel-btn" id="pg-sel-clear">Cancel</button>
@@ -509,6 +520,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 syste
 </div>
 
 <div id="pg-menu"></div>
+
+<div id="progress-modal">
+  <div class="dlg">
+    <div id="prog-title">Working…</div>
+    <div id="prog-file"></div>
+    <div id="prog-bar"><div id="prog-fill"></div></div>
+    <div id="prog-count"></div>
+    <div class="lib-btns"><button class="lib-btn" id="prog-cancel">Cancel</button></div>
+  </div>
+</div>
 
 <div id="toast"><span id="toast-msg"></span><button id="toast-action" style="display:none"></button></div>
 
@@ -634,6 +655,8 @@ function parseTIFFPreviews(buf, info) {
       const val   = type === 3 ? dv.getUint16(e+8, le) : dv.getUint32(e+8, le);
       if      (tag === 0x0100) ifdW = val;                   // ImageWidth
       else if (tag === 0x0101) ifdH = val;                   // ImageLength
+      else if (tag === 0x0112 && info && !info.orientation)
+        info.orientation = val;                              // Orientation (1..8)
       else if (tag === 0x0201) jpgOff = val;                 // JPEGInterchangeFormat
       else if (tag === 0x0202) jpgLen = val;                 // ...Length
       else if (tag === 0x0111 && count === 1) stripOff = val; // StripOffsets
@@ -709,25 +732,94 @@ function extractJPEGs(buf, info) {
   return [...parseTIFFPreviews(buf, info), ...parseRAFPreview(buf), ...scanJPEGs(buf)];
 }
 
-// resolves {img, blob} — the blob is kept so the decoded preview can be saved
-// with an edit, letting the project reopen without the original RAW
-function loadBestJPEG(candidates) {
-  return new Promise((resolve, reject) => {
-    if (!candidates.length) { reject(new Error('No embedded JPEG found')); return; }
-    // sort descending by size (largest = full-res preview)
-    const sorted = candidates.slice().sort((a,b) => b.byteLength - a.byteLength);
-    let idx = 0;
-    function tryNext() {
-      if (idx >= sorted.length) { reject(new Error('No valid JPEG found')); return; }
-      const blob = new Blob([sorted[idx++]], {type:'image/jpeg'});
-      const url  = URL.createObjectURL(blob);
-      const img  = new Image();
-      img.onload = () => { URL.revokeObjectURL(url); resolve({img, blob}); };
-      img.onerror = () => { URL.revokeObjectURL(url); tryNext(); };
-      img.src = url;
+// ── Capture orientation ─────────────────────────────────────────────────────
+// A portrait frame is written to the card as landscape pixels plus an
+// orientation tag; nothing below cares about that distinction, so the rotation
+// is applied once here and every later stage sees an upright photo.
+
+// EXIF Orientation out of a JPEG's APP1 segment, or 0 when it carries none
+function jpegOrientation(buf) {
+  const dv = new DataView(buf);
+  if (dv.byteLength < 4 || dv.getUint16(0) !== 0xFFD8) return 0;
+  let off = 2;
+  while (off + 4 <= dv.byteLength) {
+    if ((dv.getUint16(off) & 0xFF00) !== 0xFF00) return 0;
+    const marker = dv.getUint16(off), size = dv.getUint16(off + 2);
+    if (marker === 0xFFDA || size < 2) return 0;            // start of scan
+    if (marker === 0xFFE1) {                                // APP1
+      const at = off + 4;
+      if (at + 14 > dv.byteLength || dv.getUint32(at) !== 0x45786966) return 0;  // 'Exif'
+      const tiff = at + 6;
+      const le = dv.getUint16(tiff) === 0x4949;
+      if (dv.getUint16(tiff + 2, le) !== 42) return 0;
+      const ifd = tiff + dv.getUint32(tiff + 4, le);
+      if (ifd + 2 > dv.byteLength) return 0;
+      const n = dv.getUint16(ifd, le);
+      for (let i = 0; i < n && ifd + 2 + i*12 + 12 <= dv.byteLength; i++) {
+        const e = ifd + 2 + i*12;
+        if (dv.getUint16(e, le) === 0x0112) return dv.getUint16(e + 8, le);
+      }
+      return 0;
     }
-    tryNext();
-  });
+    off += 2 + size;
+  }
+  return 0;
+}
+
+// rotate/mirror pixels so an EXIF orientation of 1..8 comes out upright
+function orientCanvas(src, o) {
+  const rot = (c, n) => { for (let i = 0; i < n; i++) c = rotCanvas90(c); return c; };
+  switch (o) {
+    case 2:  return flipCanvas(src, true);
+    case 3:  return rot(src, 2);
+    case 4:  return flipCanvas(src, false);
+    case 5:  return flipCanvas(rot(src, 1), true);
+    case 6:  return rot(src, 1);
+    case 7:  return flipCanvas(rot(src, 3), true);
+    case 8:  return rot(src, 3);
+    default: return src;
+  }
+}
+
+// Decode to upright pixels, applying `orientation` ourselves.
+//
+// Browsers already rotate a JPEG that carries its own EXIF orientation, so this
+// is only ever asked to fix up the other case: a preview extracted from a RAW
+// container that is silent about its own orientation while the container's IFD
+// is not. Passing the JPEG's own tag here too would rotate the frame twice.
+async function decodeUpright(blob, orientation) {
+  if (!(orientation > 1) || typeof createImageBitmap !== 'function') return blobToImage(blob);
+  let bmp;
+  try {
+    bmp = await createImageBitmap(blob);
+  } catch(err) {
+    return blobToImage(blob);
+  }
+  const c = document.createElement('canvas');
+  c.width = bmp.width; c.height = bmp.height;
+  c.getContext('2d').drawImage(bmp, 0, 0);
+  bmp.close();
+  return orientCanvas(c, orientation);
+}
+
+// resolves {img, blob, orientation} — the blob is kept so the decoded preview
+// can be saved with an edit, letting the project reopen without the original
+// RAW, and `orientation` records the fix-up that blob will need again
+async function loadBestJPEG(candidates, containerOrientation) {
+  if (!candidates.length) throw new Error('No embedded JPEG found');
+  // sort descending by size (largest = full-res preview)
+  const sorted = candidates.slice().sort((a,b) => b.byteLength - a.byteLength);
+  let lastErr = null;
+  for (const bytes of sorted) {
+    // a preview that carries its own tag is rotated by the browser; only step
+    // in when it is silent and the container knows better
+    const orientation = jpegOrientation(bytes) ? 0 : (containerOrientation || 0);
+    const blob = new Blob([bytes], {type:'image/jpeg'});
+    try {
+      return {img: await decodeUpright(blob, orientation), blob, orientation};
+    } catch(err) { lastErr = err; }
+  }
+  throw lastErr || new Error('No valid JPEG found');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1052,8 +1144,7 @@ function uploadLUT(lut) {
 }
 
 // slider-driven uniforms, shared by the interactive view and export tiles
-function setAdjustUniforms() {
-  const s = state;
+function setAdjustUniforms(s) {
   const loc = n => gl.getUniformLocation(glProgram, n);
   gl.uniform1f(loc('u_exposure'),   s.exposure);
   gl.uniform1f(loc('u_contrast'),   s.contrast/100);
@@ -1093,7 +1184,7 @@ function render() {
   gl.bindTexture(gl.TEXTURE_2D, texLUT);
   gl.uniform1i(gl.getUniformLocation(glProgram,'u_curve_lut'), 1);
 
-  setAdjustUniforms();
+  setAdjustUniforms(state);
   const loc = n => gl.getUniformLocation(glProgram, n);
   gl.uniform1f(loc('u_time'),       performance.now()/1000);
 
@@ -1170,52 +1261,94 @@ function sourceFitScale(w, h) {
   return Math.min(1, Math.sqrt(maxSourceArea() / (w * h)), MAX_SOURCE_EDGE / Math.max(w, h));
 }
 
-function rotateBase90() {
-  if (!baseCanvas) return;
+// ── Geometry primitives ─────────────────────────────────────────────────────
+// Pure: a canvas goes in, a new canvas comes out. The live session and the
+// batch exporter both drive their geometry through these, so a photo exported
+// from the grid lands on exactly the same pixels the editor would show.
+function rotCanvas90(src) {
   const c = document.createElement('canvas');
-  c.width = baseCanvas.height; c.height = baseCanvas.width;
+  c.width = src.height; c.height = src.width;
   const ctx = c.getContext('2d');
   ctx.translate(c.width/2, c.height/2);
   ctx.rotate(Math.PI/2);
-  ctx.drawImage(baseCanvas, -baseCanvas.width/2, -baseCanvas.height/2);
-  baseCanvas = c;
+  ctx.drawImage(src, -src.width/2, -src.height/2);
+  return c;
 }
 
-function flipBase(horizontal) {
-  if (!baseCanvas) return;
+function flipCanvas(src, horizontal) {
   const c = document.createElement('canvas');
-  c.width = baseCanvas.width; c.height = baseCanvas.height;
+  c.width = src.width; c.height = src.height;
   const ctx = c.getContext('2d');
   ctx.translate(c.width/2, c.height/2);
   ctx.scale(horizontal ? -1 : 1, horizontal ? 1 : -1);
-  ctx.drawImage(baseCanvas, -c.width/2, -c.height/2);
-  baseCanvas = c;
+  ctx.drawImage(src, -c.width/2, -c.height/2);
+  return c;
 }
 
-// sourceImg at native resolution (within the memory budget), no geometry yet
-function baseFromSource() {
-  if (!sourceImg) return;
-  const img = sourceImg;
+// rotate by `deg`, growing the canvas to hold the rotated bounds
+function straightenCanvas(src, deg) {
+  const angle = (deg || 0) * Math.PI / 180;
+  const cosA = Math.abs(Math.cos(angle)), sinA = Math.abs(Math.sin(angle));
+  const cw = src.width * cosA + src.height * sinA;
+  const ch = src.width * sinA + src.height * cosA;
+  const s = sourceFitScale(cw, ch);   // straightening grows bounds a little
+  const cc = document.createElement('canvas');
+  cc.width  = Math.max(1, Math.round(cw * s));
+  cc.height = Math.max(1, Math.round(ch * s));
+  const ctx = cc.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.translate(cc.width/2, cc.height/2);
+  ctx.scale(s, s);
+  ctx.rotate(angle);
+  ctx.drawImage(src, -src.width/2, -src.height/2);
+  return cc;
+}
+
+// cut a normalised rect out of a canvas
+function cutRect(src, rect) {
+  const cw = rect.w * src.width, ch = rect.h * src.height;
+  const c = document.createElement('canvas');
+  c.width  = Math.max(1, Math.round(cw));
+  c.height = Math.max(1, Math.round(ch));
+  c.getContext('2d').drawImage(src, rect.x * src.width, rect.y * src.height, cw, ch,
+                                    0, 0, c.width, c.height);
+  return c;
+}
+
+// replay a geometry op log against any source image
+function replayGeom(img, ops) {
+  let base = canvasFromImage(img);
+  for (const op of ops || []) {
+    if (op.op === 'rot90')     base = rotCanvas90(base);
+    else if (op.op === 'flip') base = flipCanvas(base, op.axis === 'h');
+    else if (op.op === 'crop') base = cutRect(straightenCanvas(base, op.straighten), op.rect);
+  }
+  return base;
+}
+
+// the canvas the shader samples, for a given photo and a saved edit
+function workingCanvasFor(img, edit) {
+  return straightenCanvas(replayGeom(img, edit.geomOps), edit.straighten || 0);
+}
+
+// an image at native resolution (within the memory budget), no geometry yet
+function canvasFromImage(img) {
   const w = srcW(img), h = srcH(img);
   const scale = sourceFitScale(w, h);
   const tw = Math.max(1, Math.round(w * scale));
   const th = Math.max(1, Math.round(h * scale));
-  if (scale < 1) { baseCanvas = downscaleHQ(img, tw, th); return; }
+  if (scale < 1) return downscaleHQ(img, tw, th);
   const c = document.createElement('canvas');
   c.width = tw; c.height = th;
   c.getContext('2d').drawImage(img, 0, 0, tw, th);
-  baseCanvas = c;
+  return c;
 }
 
 // sourceImg → baseCanvas with current rotation/flip (used on load and crop reset)
 function rebuildBase() {
   if (!sourceImg) return;
-  baseFromSource();
-  const rot = ((state.rotation % 4) + 4) % 4;
-  for (let i = 0; i < rot; i++) rotateBase90();
-  if (state.flipH) flipBase(true);
-  if (state.flipV) flipBase(false);
   geomOps = canonicalGeomOps();
+  baseCanvas = replayGeom(sourceImg, geomOps);
 }
 
 // ── Geometry as a replayable log ────────────────────────────────────────────
@@ -1243,55 +1376,21 @@ function cloneGeomOps(ops) {
     : {...o});
 }
 
-// cut a recorded crop out of the current baseCanvas — the replay half of applyCrop
-function bakeCropOp(op) {
-  state.straighten = op.straighten;
-  buildCropCanvas();
-  const cc = cropCanvas;
-  if (!cc) return;
-  const cw = op.rect.w * cc.width, ch = op.rect.h * cc.height;
-  const baked = document.createElement('canvas');
-  baked.width  = Math.max(1, Math.round(cw));
-  baked.height = Math.max(1, Math.round(ch));
-  baked.getContext('2d').drawImage(cc, op.rect.x * cc.width, op.rect.y * cc.height, cw, ch,
-                                      0, 0, baked.width, baked.height);
-  baseCanvas = baked;
-  state.straighten = 0; // applyCrop consumes the angle it baked in
-}
-
 // rebuild baseCanvas from the original image by replaying the op log
 function applyGeomOps() {
   if (!sourceImg) return;
-  baseFromSource();
+  baseCanvas = replayGeom(sourceImg, geomOps);
   let rot = 0, fh = false, fv = false;
   for (const op of geomOps) {
-    if (op.op === 'rot90')     { rotateBase90(); rot = (rot + 1) % 4; }
-    else if (op.op === 'flip') { flipBase(op.axis === 'h'); if (op.axis === 'h') fh = !fh; else fv = !fv; }
-    else if (op.op === 'crop') { bakeCropOp(op); }
+    if (op.op === 'rot90')     rot = (rot + 1) % 4;
+    else if (op.op === 'flip') { if (op.axis === 'h') fh = !fh; else fv = !fv; }
   }
   state.rotation = rot; state.flipH = fh; state.flipV = fv;
 }
 
 function buildCropCanvas() {
   if (!baseCanvas) return;
-  const src = baseCanvas;
-  const angle = state.straighten * Math.PI / 180;
-  const cosA  = Math.abs(Math.cos(angle));
-  const sinA  = Math.abs(Math.sin(angle));
-
-  const cw = src.width * cosA + src.height * sinA;
-  const ch = src.width * sinA + src.height * cosA;
-  const s = sourceFitScale(cw, ch);   // straightening grows bounds a little
-  const cc = document.createElement('canvas');
-  cc.width  = Math.max(1, Math.round(cw * s));
-  cc.height = Math.max(1, Math.round(ch * s));
-  const ctx = cc.getContext('2d');
-  ctx.imageSmoothingQuality = 'high';
-  ctx.translate(cc.width/2, cc.height/2);
-  ctx.scale(s, s);
-  ctx.rotate(angle);
-  ctx.drawImage(src, -src.width/2, -src.height/2);
-  cropCanvas = cc;
+  cropCanvas = straightenCanvas(baseCanvas, state.straighten);
 }
 
 // The fitted view samples a GPU-sized copy of the full-res working image.
@@ -1918,16 +2017,11 @@ function applyCrop() {
 
   pushHistory('Crop');
   // record before baking — cropCanvas is still the straightened canvas this rect was drawn on
-  geomOps.push({op:'crop', straighten: state.straighten, rect:{
-    x: cx0 / cropCanvas.width,  y: cy0 / cropCanvas.height,
-    w: cw  / cropCanvas.width,  h: ch  / cropCanvas.height,
-  }});
+  const rect = {x: cx0 / cropCanvas.width, y: cy0 / cropCanvas.height,
+                w: cw  / cropCanvas.width, h: ch  / cropCanvas.height};
+  geomOps.push({op:'crop', straighten: state.straighten, rect});
   // bake the selected region of the displayed (straightened) image into baseCanvas
-  const baked = document.createElement('canvas');
-  baked.width  = Math.round(cw);
-  baked.height = Math.round(ch);
-  baked.getContext('2d').drawImage(cropCanvas, cx0, cy0, cw, ch, 0, 0, baked.width, baked.height);
-  baseCanvas = baked;
+  baseCanvas = cutRect(cropCanvas, rect);
   state.straighten = 0;
   document.getElementById('s-straighten').value = 0;
   document.getElementById('v-straighten').textContent = '0°';
@@ -2548,13 +2642,14 @@ async function loadFile(file) {
   overlay.classList.remove('hidden');
   msg.style.color = '';
   msg.textContent = 'Loading…';
-  let img, blob, kind = 'preview';
+  let img, blob, kind = 'preview', orientation = 0;
   const info = {};
   let buf = null;
   try {
     buf = await file.arrayBuffer();
     const candidates = extractJPEGs(buf, info);
-    ({img, blob} = await loadBestJPEG(candidates.length ? candidates : [buf]));
+    ({img, blob, orientation} = await loadBestJPEG(
+        candidates.length ? candidates : [buf], info.orientation));
   } catch(err) {
     // a RAW with no usable embedded preview: develop it up front instead
     if (buf && isRawName(file.name)) {
@@ -2588,6 +2683,8 @@ async function loadFile(file) {
     name: file.name, size: file.size, lastModified: file.lastModified,
     rawW: kind === 'raw' ? srcW(img) : (info.rawW || 0),
     rawH: kind === 'raw' ? srcH(img) : (info.rawH || 0),
+    // LibRaw applies the camera flip itself, so a develop needs no fix-up
+    orientation: kind === 'raw' ? 0 : orientation,
   }, kind);
   // keep the original bytes around: if this photo is (or gets) filed in an
   // album, the RAW is stored with it so it redevelops at full quality later
@@ -2756,7 +2853,10 @@ async function upgradeStoredPreview() {
 function swapSource(canvas) {
   sourceImg = canvas;
   sourceKind = 'raw';
-  if (sourceMeta) { sourceMeta.rawW = canvas.width; sourceMeta.rawH = canvas.height; }
+  if (sourceMeta) {
+    sourceMeta.rawW = canvas.width; sourceMeta.rawH = canvas.height;
+    sourceMeta.orientation = 0;   // LibRaw already applied the camera flip
+  }
   // history snapshots hold preview-resolution canvases — drop the references so
   // a restore replays the geometry against the developed image instead
   for (const h of history) h.snap.baseCanvas = null;
@@ -2886,7 +2986,8 @@ function buildDoc() {
     format: DOC_FORMAT, version: DOC_VERSION, savedAt: new Date().toISOString(),
     source: {name: sourceMeta?.name || 'photo', size: sourceMeta?.size || 0,
              lastModified: sourceMeta?.lastModified || 0,
-             rawW: sourceMeta?.rawW || 0, rawH: sourceMeta?.rawH || 0},
+             rawW: sourceMeta?.rawW || 0, rawH: sourceMeta?.rawH || 0,
+             orientation: sourceMeta?.orientation || 0},
     edit: serializeEdit(),
     history: history.map(h => ({label: h.label, edit: {
       params: {...h.snap.params}, curvePoints: h.snap.curvePoints.map(p=>({x:p.x,y:p.y})),
@@ -2911,9 +3012,25 @@ function applyEditDoc(doc) {
 }
 
 // ── Device storage (IndexedDB) ──────────────────────────────────────────────
+// Albums are the whole filing system: every photo belongs to at least one, and
+// an edit is saved into the photo's album record as it is made. There is no
+// separate global save — nothing is stored outside an album.
 const DB_NAME = 'safelight', DB_STORE = 'projects', DB_ALBUMS = 'albums', DB_VERSION = 2;
-const PROJECTS_KEPT = 30;
 let dbPromise = null;
+
+// The inbox every photo lands in until it is filed somewhere deliberate.
+// Filing a photo into an album of your own is also what promises to keep its
+// original RAW — holding one for every photo ever opened would fill the disk.
+const INBOX = {id:'inbox', name:'Imports'};
+const isKeepAlbum = id => id && id !== INBOX.id;
+const keepsRaw = albums => (albums || []).some(isKeepAlbum);
+
+async function inboxAlbumId() {
+  const albums = await idbAlbums().catch(() => []);
+  if (!albums.some(a => a.id === INBOX.id))
+    await idbAlbumPut({...INBOX, created: 0}).catch(() => {});
+  return INBOX.id;
+}
 
 function idb() {
   if (dbPromise) return dbPromise;
@@ -2967,7 +3084,8 @@ async function saveToDevice(quiet) {
   if (!sourceImg || !currentProject) return false;
   try {
     const prev = await idbGet(currentProject.id).catch(() => null);
-    const albums = prev?.albums || [];
+    // no photo is ever stored outside an album — an unfiled one goes to the inbox
+    const albums = prev?.albums?.length ? prev.albums : [await inboxAlbumId()];
     await idbPut({
       id: currentProject.id,
       name: sourceMeta?.name || 'photo',
@@ -2975,20 +3093,19 @@ async function saveToDevice(quiet) {
       edits: history.length,
       doc: buildDoc(),
       preview: sourceBlob || null,
-      // album photos keep the original RAW so they redevelop at full quality;
-      // loose ones don't — a card's worth of 24MB files would sink the quota
-      raw: albums.length ? (sourceRawBlob || prev?.raw || null) : null,
+      // photos filed in an album of your own keep the original RAW so they
+      // redevelop at full quality; the inbox doesn't — a card's worth of 24MB
+      // files would sink the quota
+      raw: keepsRaw(albums) ? (sourceRawBlob || prev?.raw || null) : null,
       thumb: makeThumb(),
       w: srcW(sourceImg), h: srcH(sourceImg),
       driveFileId: currentProject.driveFileId || prev?.driveFileId || null,
       albums,
     });
-    await pruneProjects();
     lastSavedAt = Date.now();
     refreshLibraryStatus();
-    renderLibraryList();
     if (photosIsOpen()) renderPhotos();
-    if (!quiet) toast('Saved on this device');
+    if (!quiet) toast('Saved');
     return true;
   } catch(err) {
     // a multi-megabyte preview per project can hit the storage quota
@@ -2996,16 +3113,6 @@ async function saveToDevice(quiet) {
                                                : 'Could not save on this device');
     return false;
   }
-}
-
-// Trims the automatic backlog. Anything filed in an album was kept on purpose,
-// so it is never pruned — only the user deletes those.
-async function pruneProjects() {
-  const all = await idbAll();
-  const loose = all.filter(r => !(r.albums || []).length);
-  if (loose.length <= PROJECTS_KEPT) return;
-  loose.sort((a,b) => b.savedAt - a.savedAt);
-  for (const rec of loose.slice(PROJECTS_KEPT)) await idbDel(rec.id);
 }
 
 let autosaveTimer = null, lastSavedAt = 0;
@@ -3020,7 +3127,7 @@ async function openProject(id) {
   const rec = await idbGet(id).catch(() => null);
   if (!rec) { toast('That saved edit is gone'); return; }
   if (rec.preview) {
-    const img = await blobToImage(rec.preview).catch(() => null);
+    const img = await decodeUpright(rec.preview, rec.doc.source?.orientation).catch(() => null);
     if (!img) { toast('Saved photo could not be decoded'); return; }
     beginSession(img, rec.preview, rec.doc.source,
                  isRawName(rec.doc.source?.name) ? 'preview' : 'image');
@@ -3110,7 +3217,7 @@ async function openEditDoc(doc) {
   if (!doc || doc.format !== DOC_FORMAT) { toast('That file is not a saved edit'); return; }
   if (doc.image) {
     const blob = dataURLToBlob(doc.image);
-    const img = await blobToImage(blob).catch(() => null);
+    const img = await decodeUpright(blob, doc.source?.orientation).catch(() => null);
     if (!img) { toast('The photo inside that file could not be decoded'); return; }
     beginSession(img, blob, doc.source, isRawName(doc.source?.name) ? 'preview' : 'image');
     applyEditDoc(doc);
@@ -3309,44 +3416,25 @@ function refreshLibraryStatus() {
     if (developNote) txt += (txt ? ' · ' : '') + developNote;
     src.textContent = txt;
   }
+  refreshAlbumLine();
 }
 
-async function renderLibraryList() {
-  const box = document.getElementById('lib-list');
-  if (!box) return;
-  let all = [];
-  try { all = await idbAll(); } catch(e) { box.innerHTML = '<div class="lib-empty">Device storage unavailable</div>'; return; }
-  if (!all.length) { box.innerHTML = '<div class="lib-empty">Nothing saved yet</div>'; return; }
-  all.sort((a,b) => b.savedAt - a.savedAt);
-  box.innerHTML = '';
-  for (const rec of all) {
-    const row = document.createElement('div');
-    row.className = 'lib-row';
-    if (rec.thumb) {
-      const img = document.createElement('img');
-      img.src = rec.thumb; img.alt = '';
-      row.appendChild(img);
-    }
-    const meta = document.createElement('div');
-    meta.className = 'lib-meta';
-    const name = document.createElement('div');
-    name.className = 'lib-name';
-    name.textContent = rec.name;
-    const sub = document.createElement('div');
-    sub.className = 'lib-sub';
-    sub.textContent = `${rec.edits} ${rec.edits === 1 ? 'edit' : 'edits'} · ${new Date(rec.savedAt).toLocaleString()}`;
-    meta.append(name, sub);
-    const open = document.createElement('button');
-    open.textContent = rec.id === currentProject?.id ? 'Reload' : 'Open';
-    open.addEventListener('click', () => openProject(rec.id));
-    const del = document.createElement('button');
-    del.className = 'lib-del';
-    del.textContent = 'Delete';
-    del.addEventListener('click', async () => { await idbDel(rec.id); renderLibraryList(); });
-    row.append(meta, open, del);
-    box.appendChild(row);
-  }
+// which albums the open photo is filed in — the only place its edits live
+async function refreshAlbumLine() {
+  const el = document.getElementById('lib-albums');
+  if (!el) return;
+  if (!sourceImg || !currentProject) { el.textContent = ''; return; }
+  const [rec, albums] = await Promise.all([
+    idbGet(currentProject.id).catch(() => null),
+    idbAlbums().catch(() => []),
+  ]);
+  const names = (rec?.albums || [])
+    .map(id => albums.find(a => a.id === id)?.name).filter(Boolean);
+  el.textContent = names.length
+    ? `In ${names.join(' · ')}${keepsRaw(rec.albums) && rec.raw ? ' · original RAW kept' : ''}`
+    : 'Saving to Imports…';
 }
+
 
 // ── Photos & albums ─────────────────────────────────────────────────────────
 // A browsing layer over the same saved projects the panel above manages:
@@ -3359,6 +3447,7 @@ const pg = {
   selection: new Set(),
 };
 let pgDragIds = [];
+let exportBatchIds = null;   // non-null while the export menu targets a selection
 
 function photosIsOpen() { return document.getElementById('photos-view').classList.contains('open'); }
 function albumId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
@@ -3388,7 +3477,7 @@ async function decodeForImport(file) {
   try {
     const buf = await file.arrayBuffer();
     const candidates = extractJPEGs(buf, info);
-    return {...await loadBestJPEG(candidates.length ? candidates : [buf]), info};
+    return {...await loadBestJPEG(candidates.length ? candidates : [buf], info.orientation), info};
   } catch(err) {
     // a RAW with no usable embedded preview: develop it and store a rendition
     if (isRawName(file.name)) try {
@@ -3399,6 +3488,7 @@ async function decodeForImport(file) {
         : c;
       const blob = await new Promise(res => small.toBlob(res, 'image/jpeg', 0.88));
       info.rawW = c.width; info.rawH = c.height;
+      info.orientation = 0;   // the develop is already upright
       return {img: c, blob, info};
     } catch(e2) { /* fall through to the plain-image attempt */ }
     return {img: await blobToImage(file), blob: file, info};
@@ -3423,13 +3513,17 @@ function setImportStatus(text, isError) {
 async function importFiles(files) {
   const list = [...files].filter(f => f && f.size > 0);
   if (!list.length) return [];
-  const album = pg.album === 'all' ? null : pg.album;
+  const album = pg.album === 'all' ? await inboxAlbumId() : pg.album;
   const ids = [], failed = [];
   let quota = false;
 
+  showProgress(`Importing ${list.length} photo${list.length > 1 ? 's' : ''}`);
+  let cancelled = false;
   for (let i = 0; i < list.length; i++) {
+    if (prog.cancelled) { cancelled = true; break; }
     const f = list[i];
-    setImportStatus(list.length > 1 ? `Importing ${i+1} of ${list.length}… ${f.name}` : 'Loading…');
+    updateProgress(i, list.length, f.name);
+    await nextFrame();          // let the bar paint before the decode blocks
     const meta = {name: f.name, size: f.size, lastModified: f.lastModified};
     const id = projectId(meta);
     try {
@@ -3439,19 +3533,20 @@ async function importFiles(files) {
         let dirty = false;
         if (album && !prev.albums.includes(album)) { prev.albums.push(album); dirty = true; }
         // the original file is in hand — attach it if the photo is album-kept
-        if (prev.albums.length && !prev.raw && isRawName(f.name)) { prev.raw = f; dirty = true; }
+        if (keepsRaw(prev.albums) && !prev.raw && isRawName(f.name)) { prev.raw = f; dirty = true; }
         if (dirty) await idbPut(prev);
       } else {
         const {img, blob, info} = await decodeForImport(f);
         meta.rawW = info.rawW || 0;
         meta.rawH = info.rawH || 0;
+        meta.orientation = info.orientation || 0;
         await idbPut({
           id, name: f.name, savedAt: Date.now(), edits: 0,
           doc: blankDoc(meta), preview: blob || null,
-          raw: (album && isRawName(f.name)) ? f : null,
+          raw: (keepsRaw([album]) && isRawName(f.name)) ? f : null,
           thumb: thumbFrom(img, srcW(img), srcH(img)),
           w: srcW(img), h: srcH(img),
-          driveFileId: null, albums: album ? [album] : [],
+          driveFileId: null, albums: [album],
         });
       }
       ids.push(id);
@@ -3462,15 +3557,18 @@ async function importFiles(files) {
     }
   }
 
+  updateProgress(ids.length, list.length, 'Finishing…');
+  hideProgress();
+
   await loadPhotos();
   if (photosIsOpen()) renderPhotos();
-  renderLibraryList();
   updateDropOverlay();
 
   if (quota)                   setImportStatus('Device storage is full — delete some photos and try again', true);
   else if (failed.length === list.length) setImportStatus(`Could not read ${failed[0]}`, true);
   else if (failed.length)      setImportStatus(`${failed.length} file${failed.length>1?'s':''} could not be read`, true);
   else                         setImportStatus('');
+  if (cancelled && ids.length) toast(`Stopped after importing ${ids.length} of ${list.length}`);
   return ids;
 }
 
@@ -3506,11 +3604,12 @@ async function renameAlbum(id) {
 
 async function deleteAlbum(id) {
   const album = albumRec(id);
-  if (!album) return;
+  if (!album || id === INBOX.id) return;
   if (!confirm(`Delete the album “${album.name}”? The photos stay in your library.`)) return;
   for (const p of pg.photos.filter(p => (p.albums || []).includes(id))) {
     p.albums = p.albums.filter(a => a !== id);
-    if (!p.albums.length && p.raw) p.raw = null;   // RAW rides with album membership
+    if (!p.albums.length) p.albums = [await inboxAlbumId()];   // never unfiled
+    if (!keepsRaw(p.albums)) p.raw = null;   // the RAW rides with real albums
     await idbPut(p);
   }
   pg.albums = pg.albums.filter(a => a.id !== id);
@@ -3529,7 +3628,8 @@ async function addToAlbum(ids, album) {
       p.albums.push(album);
       // filing the open photo into an album: its original RAW is still in
       // memory, so store it alongside for full-quality redevelops
-      if (!p.raw && sourceRawBlob && currentProject?.id === id) p.raw = sourceRawBlob;
+      if (isKeepAlbum(album) && !p.raw && sourceRawBlob && currentProject?.id === id)
+        p.raw = sourceRawBlob;
       await idbPut(p);
     }
   }
@@ -3542,10 +3642,12 @@ async function removeFromAlbum(ids, album) {
     const p = pg.photos.find(x => x.id === id);
     if (!p || !p.albums) continue;
     p.albums = p.albums.filter(a => a !== album);
-    if (!p.albums.length && p.raw) p.raw = null;   // RAW rides with album membership
+    if (!p.albums.length) p.albums = [await inboxAlbumId()];   // never unfiled
+    if (!keepsRaw(p.albums)) p.raw = null;   // the RAW rides with real albums
     await idbPut(p);
   }
   pg.selection.clear();
+  await loadPhotos();
   renderPhotos();
 }
 
@@ -3556,7 +3658,6 @@ async function deletePhotos(ids) {
   pg.photos = pg.photos.filter(p => !ids.includes(p.id));
   pg.selection.clear();
   renderPhotos();
-  renderLibraryList();
   updateDropOverlay();
 }
 
@@ -3579,7 +3680,7 @@ function renderAlbumRail() {
   const wrap = document.getElementById('pg-albums');
   wrap.innerHTML = '';
 
-  const addRow = (id, name, count, isUser) => {
+  const addRow = (id, name, count, isUser, noMenu) => {
     const row = document.createElement('div');
     row.className = 'album-row' + (pg.album === id ? ' active' : '');
     row.innerHTML = isUser ? ICON_ALBUM : ICON_GRID;
@@ -3591,7 +3692,7 @@ function renderAlbumRail() {
     cnt.className = 'album-count';
     cnt.textContent = count;
     row.appendChild(cnt);
-    if (isUser) {
+    if (isUser && !noMenu) {
       const more = document.createElement('button');
       more.className = 'album-more';
       more.textContent = '⋯';
@@ -3629,7 +3730,7 @@ function renderAlbumRail() {
   const sep = document.createElement('div');
   sep.className = 'album-sep';
   wrap.appendChild(sep);
-  for (const a of pg.albums) addRow(a.id, a.name, albumCount(a.id), true);
+  for (const a of pg.albums) addRow(a.id, a.name, albumCount(a.id), true, a.id === INBOX.id);
 
   const add = document.createElement('button');
   add.id = 'pg-new-album';
@@ -3859,6 +3960,187 @@ function wirePhotos() {
   });
 }
 
+// ── Progress modal ──────────────────────────────────────────────────────────
+// Importing a card's worth of RAW files or exporting a selection takes real
+// time, so both report where they are and can be stopped part-way.
+const prog = {open:false, cancelled:false};
+
+// let the modal actually paint between units of work
+const nextFrame = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+
+function showProgress(title) {
+  prog.open = true;
+  prog.cancelled = false;
+  document.getElementById('prog-title').textContent = title;
+  document.getElementById('prog-file').textContent = '';
+  document.getElementById('prog-count').textContent = '';
+  document.getElementById('prog-fill').style.width = '0%';
+  document.getElementById('prog-cancel').textContent = 'Cancel';
+  document.getElementById('progress-modal').classList.add('open');
+}
+
+function updateProgress(done, total, label) {
+  if (!prog.open) return;
+  document.getElementById('prog-fill').style.width =
+    (total ? Math.round(done / total * 100) : 0) + '%';
+  document.getElementById('prog-count').textContent = `${done} of ${total}`;
+  if (label !== undefined) document.getElementById('prog-file').textContent = label;
+}
+
+function hideProgress() {
+  prog.open = false;
+  document.getElementById('progress-modal').classList.remove('open');
+}
+
+// ── Batch export ────────────────────────────────────────────────────────────
+// Several photos leave as one file. JPEG and TIFF payloads gain nothing from
+// deflate, so the archive stores them uncompressed and the whole writer stays
+// small enough to carry in-page.
+function crc32(buf) {
+  let table = crc32.table;
+  if (!table) {
+    table = crc32.table = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+      let c = i;
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      table[i] = c >>> 0;
+    }
+  }
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) c = table[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function dosDateTime(d = new Date()) {
+  return {
+    time: (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1),
+    date: ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate(),
+  };
+}
+
+function makeZip(entries) {
+  const enc = new TextEncoder();
+  const {time, date} = dosDateTime();
+  const parts = [], central = [];
+  let offset = 0, cdSize = 0;
+  for (const e of entries) {
+    const name = enc.encode(e.name);
+    const crc = crc32(e.data);
+    const lf = new DataView(new ArrayBuffer(30));
+    lf.setUint32(0, 0x04034b50, true);
+    lf.setUint16(4, 20, true);       // version needed
+    lf.setUint16(6, 0x0800, true);   // UTF-8 names
+    lf.setUint16(8, 0, true);        // stored, no compression
+    lf.setUint16(10, time, true); lf.setUint16(12, date, true);
+    lf.setUint32(14, crc, true);
+    lf.setUint32(18, e.data.length, true);
+    lf.setUint32(22, e.data.length, true);
+    lf.setUint16(26, name.length, true);
+    parts.push(new Uint8Array(lf.buffer), name, e.data);
+
+    const cd = new DataView(new ArrayBuffer(46));
+    cd.setUint32(0, 0x02014b50, true);
+    cd.setUint16(4, 20, true); cd.setUint16(6, 20, true);
+    cd.setUint16(8, 0x0800, true);
+    cd.setUint16(10, 0, true);
+    cd.setUint16(12, time, true); cd.setUint16(14, date, true);
+    cd.setUint32(16, crc, true);
+    cd.setUint32(20, e.data.length, true);
+    cd.setUint32(24, e.data.length, true);
+    cd.setUint16(28, name.length, true);
+    cd.setUint32(42, offset, true);
+    central.push(new Uint8Array(cd.buffer), name);
+    cdSize += 46 + name.length;
+    offset += 30 + name.length + e.data.length;
+  }
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true);
+  end.setUint16(8, entries.length, true);
+  end.setUint16(10, entries.length, true);
+  end.setUint32(12, cdSize, true);
+  end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, new Uint8Array(end.buffer)], {type:'application/zip'});
+}
+
+// a slider state object out of a stored edit, for rendering off-session
+function stateFromEdit(e) {
+  const st = {};
+  for (const k of PARAMS) st[k] = e.params?.[k] ?? 0;
+  st.splitShadow = (e.splitShadow || [0,0,0]).slice();
+  st.splitHigh   = (e.splitHigh   || [0,0,0]).slice();
+  return st;
+}
+
+// the best pixels a stored photo can offer: its RAW when one is kept, else the
+// stored preview
+async function sourceForRecord(rec) {
+  if (rec.raw) {
+    try { return await decodeRawToCanvas(await rec.raw.arrayBuffer()); }
+    catch(err) { console.warn('RAW develop failed for', rec.name, err); }
+  }
+  if (!rec.preview) throw new Error('no pixels stored');
+  return decodeUpright(rec.preview, rec.doc?.source?.orientation);
+}
+
+async function exportSelection(ids, format, maxEdge, quality) {
+  if (!ids.length) return;
+  if (!gl) { initGL(document.getElementById('main-canvas')); if (!gl) return; }
+  // the open photo may have edits not yet written to its album record
+  if (sourceImg && currentProject) await saveToDevice(true);
+
+  showProgress(`Exporting ${ids.length} photo${ids.length > 1 ? 's' : ''}`);
+  const entries = [], failed = [];
+  const used = new Set();
+  try {
+    for (let i = 0; i < ids.length; i++) {
+      if (prog.cancelled) break;
+      const rec = await idbGet(ids[i]).catch(() => null);
+      updateProgress(i, ids.length, rec ? rec.name : '');
+      await nextFrame();
+      if (!rec) { failed.push(ids[i]); continue; }
+      try {
+        const img  = await sourceForRecord(rec);
+        const edit = rec.doc?.edit || blankDoc(rec.doc?.source || {}).edit;
+        const work = workingCanvasFor(img, edit);
+        const out  = renderEdit(work, stateFromEdit(edit), edit.curvePoints, maxEdge);
+        const blob = await encodeExport(out, format, quality);
+        let name = exportNameFor(rec.name, format === 'tiff' ? 'tif' : 'jpg');
+        for (let n = 2; used.has(name); n++)
+          name = exportNameFor(rec.name, format === 'tiff' ? 'tif' : 'jpg', n);
+        used.add(name);
+        entries.push({name, data: new Uint8Array(await blob.arrayBuffer())});
+      } catch(err) {
+        console.warn('Export failed for', rec.name, err);
+        failed.push(rec.name);
+      }
+    }
+    updateProgress(entries.length, ids.length, 'Packing the archive…');
+    await nextFrame();
+  } finally {
+    hideProgress();
+    // hand the interactive view its own texture and curve back
+    if (cropCanvas) {
+      uploadLUT(buildCurveLUT(state.curvePoints));
+      uploadTexture(previewCanvas || cropCanvas);
+      roi.active = false;
+      fitCanvas();
+      scheduleRender();
+    }
+  }
+
+  if (!entries.length) { toast('Nothing could be exported'); return; }
+  try {
+    downloadBlob(makeZip(entries), `safelight-export-${entries.length}.zip`);
+  } catch(err) {
+    toast('The export was too large to package — try a smaller size or fewer photos');
+    return;
+  }
+  const stopped = prog.cancelled ? ' (stopped early)' : '';
+  toast(failed.length
+    ? `Exported ${entries.length}, ${failed.length} failed${stopped}`
+    : `Exported ${entries.length} photo${entries.length > 1 ? 's' : ''}${stopped}`);
+}
+
 // ── Toast ───────────────────────────────────────────────────────────────────
 let toastTimer = null;
 function toast(msg, actionLabel, onAction, ms = 6000) {
@@ -3929,9 +4211,20 @@ function downloadBlob(blob, name) {
   setTimeout(() => URL.revokeObjectURL(a.href), 30000);
 }
 
-function exportName(ext) {
-  const base = (sourceMeta?.name || 'safelight').replace(/\.[^.]+$/, '');
-  return `${base}-edit.${ext}`;
+function exportNameFor(sourceName, ext, dup) {
+  const base = (sourceName || 'safelight').replace(/\.[^.]+$/, '');
+  return `${base}-edit${dup ? '-' + dup : ''}.${ext}`;
+}
+const exportName = ext => exportNameFor(sourceMeta?.name, ext);
+
+// Encode rendered pixels. TIFF is written here because browsers cannot.
+function encodeExport(out, format, quality) {
+  if (format === 'tiff')
+    return Promise.resolve(new Blob([encodeTIFF(out.pixels, out.w, out.h)], {type:'image/tiff'}));
+  const c = document.createElement('canvas');
+  c.width = out.w; c.height = out.h;
+  c.getContext('2d').putImageData(new ImageData(out.pixels, out.w, out.h), 0, 0);
+  return new Promise(res => c.toBlob(res, 'image/jpeg', quality/100));
 }
 
 function exportImage(format = 'jpeg', maxEdge = 0, quality = 92) {
@@ -3944,18 +4237,20 @@ function exportImage(format = 'jpeg', maxEdge = 0, quality = 92) {
   }, 30);
 }
 
-// Renders the edit at the working image's own resolution. The output routinely
+// Renders an edit at the working image's own resolution. The output routinely
 // exceeds the GPU's texture/renderbuffer limits, so it is rendered in tiles and
 // stitched. Each tile is padded past the sharpen/clarity sampling neighborhood
-// so the seams cannot show.
-function exportImageNow(format, maxEdge, quality) {
-  const iw = cropCanvas.width, ih = cropCanvas.height;
+// so the seams cannot show. Takes its image and edit as arguments, so the batch
+// exporter can render a stored photo without disturbing the open session.
+function renderEdit(srcCanvas, st, curvePoints, maxEdge) {
+  const iw = srcCanvas.width, ih = srcCanvas.height;
   const scale = maxEdge ? Math.min(1, maxEdge/Math.max(iw,ih)) : 1;
   const ew = Math.max(1, Math.round(iw*scale)), eh = Math.max(1, Math.round(ih*scale));
 
   // downscale first when a smaller size was asked for — stepped 2D downscaling
   // filters far better than GPU minification
-  const src = scale < 1 ? downscaleHQ(cropCanvas, ew, eh) : cropCanvas;
+  const src = scale < 1 ? downscaleHQ(srcCanvas, ew, eh) : srcCanvas;
+  uploadLUT(buildCurveLUT(curvePoints || [{x:0,y:0},{x:1,y:1}]));
 
   const PAD = 8;
   const maxT = Math.min(maxTexSize(), gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || maxTexSize());
@@ -3980,7 +4275,7 @@ function exportImageNow(format, maxEdge, quality) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 
   const loc = n => gl.getUniformLocation(glProgram, n);
-  setAdjustUniforms();
+  setAdjustUniforms(st);
   gl.uniform1f(loc('u_time'), 0);           // stable grain in exports
   gl.uniform4f(loc('u_quad'), 0, 0, 1, 1);
 
@@ -4025,20 +4320,19 @@ function exportImageNow(format, maxEdge, quality) {
   gl.deleteFramebuffer(fbo);
   gl.deleteTexture(rTex);
   gl.deleteTexture(srcTex);
-  scheduleRender();   // rebinds the interactive view's texture and uniforms
+  return {pixels: out, w: ew, h: eh};
+}
 
-  if (format === 'tiff') {
-    downloadBlob(new Blob([encodeTIFF(out, ew, eh)], {type:'image/tiff'}), exportName('tif'));
-    toast(`Exported TIFF · ${ew} × ${eh}`);
-    return;
-  }
-  const outCanvas = document.createElement('canvas');
-  outCanvas.width = ew; outCanvas.height = eh;
-  outCanvas.getContext('2d').putImageData(new ImageData(out, ew, eh), 0, 0);
-  outCanvas.toBlob(blob => {
-    downloadBlob(blob, exportName('jpg'));
-    toast(`Exported JPEG · ${ew} × ${eh}`);
-  }, 'image/jpeg', quality/100);
+// the open photo, straight to a file
+function exportImageNow(format, maxEdge, quality) {
+  const out = renderEdit(cropCanvas, state, state.curvePoints, maxEdge);
+  // hand the interactive view its own curve and texture back
+  uploadLUT(buildCurveLUT(state.curvePoints));
+  scheduleRender();
+  encodeExport(out, format, quality).then(blob => {
+    downloadBlob(blob, exportName(format === 'tiff' ? 'tif' : 'jpg'));
+    toast(`Exported ${format.toUpperCase()} · ${out.w} × ${out.h}`);
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -4121,11 +4415,10 @@ function init() {
   document.getElementById('btn-library').addEventListener('click', () => {
     switchPanel('library');
     refreshLibraryStatus();
-    renderLibraryList();
   });
 
   // Saved edits
-  document.getElementById('lib-save-device').addEventListener('click', () => saveToDevice(false));
+  document.getElementById('lib-albums-btn').addEventListener('click', openPhotos);
   document.getElementById('lib-save-file').addEventListener('click', saveEditFile);
   document.getElementById('lib-open-file').addEventListener('click', () => document.getElementById('edit-file-input').click());
   document.getElementById('edit-file-input').addEventListener('change', e => {
@@ -4184,21 +4477,21 @@ function init() {
     pushHistory('Rotate 90°');
     state.rotation = (state.rotation + 1) % 4;
     geomOps.push({op:'rot90'});
-    rotateBase90(); buildCropCanvas(); refreshTexture();
+    baseCanvas = rotCanvas90(baseCanvas); buildCropCanvas(); refreshTexture();
   });
   document.getElementById('crop-fliph-btn').addEventListener('click', () => {
     if (!baseCanvas) return;
     pushHistory('Flip horizontal');
     state.flipH = !state.flipH;
     geomOps.push({op:'flip', axis:'h'});
-    flipBase(true); buildCropCanvas(); refreshTexture();
+    baseCanvas = flipCanvas(baseCanvas, true); buildCropCanvas(); refreshTexture();
   });
   document.getElementById('crop-flipv-btn').addEventListener('click', () => {
     if (!baseCanvas) return;
     pushHistory('Flip vertical');
     state.flipV = !state.flipV;
     geomOps.push({op:'flip', axis:'v'});
-    flipBase(false); buildCropCanvas(); refreshTexture();
+    baseCanvas = flipCanvas(baseCanvas, false); buildCropCanvas(); refreshTexture();
   });
   document.getElementById('crop-apply').addEventListener('click', applyCrop);
   document.getElementById('crop-reset').addEventListener('click', resetCrop);
@@ -4279,17 +4572,34 @@ function init() {
     }
   });
 
-  // Export dialog
+  // Export dialog — shared by the open photo and a grid selection
   const exportMenu = document.getElementById('export-menu');
   let expFmt = 'jpeg', expSize = 0;
+  const setExportLabel = () => {
+    document.getElementById('export-go').textContent = exportBatchIds
+      ? `Export ${exportBatchIds.length} as ${expFmt.toUpperCase()}`
+      : 'Export ' + expFmt.toUpperCase();
+  };
+  const openExportMenu = anchor => {
+    exportMenu.classList.add('open');
+    setExportLabel();
+    const r = anchor.getBoundingClientRect();
+    const mw = exportMenu.offsetWidth, mh = exportMenu.offsetHeight;
+    exportMenu.style.left = Math.min(window.innerWidth - mw - 8, Math.max(8, r.right - mw)) + 'px';
+    exportMenu.style.top  = (r.bottom + 6 + mh > window.innerHeight
+      ? Math.max(8, r.top - 6 - mh) : r.bottom + 6) + 'px';
+  };
   document.getElementById('export-btn').addEventListener('click', e => {
     e.stopPropagation();
     if (exportMenu.classList.contains('open')) { exportMenu.classList.remove('open'); return; }
-    exportMenu.classList.add('open');
-    const r = e.currentTarget.getBoundingClientRect();
-    const mw = exportMenu.offsetWidth, mh = exportMenu.offsetHeight;
-    exportMenu.style.left = Math.min(window.innerWidth - mw - 8, Math.max(8, r.right - mw)) + 'px';
-    exportMenu.style.top  = (r.bottom + 6 + mh > window.innerHeight ? r.top - 6 - mh : r.bottom + 6) + 'px';
+    exportBatchIds = null;
+    openExportMenu(e.currentTarget);
+  });
+  document.getElementById('pg-sel-export').addEventListener('click', e => {
+    e.stopPropagation();
+    if (!pg.selection.size) return;
+    exportBatchIds = [...pg.selection];
+    openExportMenu(e.currentTarget);
   });
   document.addEventListener('click', () => exportMenu.classList.remove('open'));
   exportMenu.addEventListener('click', e => e.stopPropagation());
@@ -4297,7 +4607,7 @@ function init() {
     expFmt = b.dataset.fmt;
     document.querySelectorAll('.exp-fmt').forEach(x => x.classList.toggle('active', x === b));
     document.getElementById('exp-quality-row').style.display = expFmt === 'jpeg' ? '' : 'none';
-    document.getElementById('export-go').textContent = 'Export ' + expFmt.toUpperCase();
+    setExportLabel();
   }));
   document.querySelectorAll('.exp-size').forEach(b => b.addEventListener('click', () => {
     expSize = parseInt(b.dataset.size, 10);
@@ -4309,7 +4619,18 @@ function init() {
   });
   document.getElementById('export-go').addEventListener('click', () => {
     exportMenu.classList.remove('open');
-    exportImage(expFmt, expSize, parseInt(expQ.value, 10));
+    const quality = parseInt(expQ.value, 10);
+    if (exportBatchIds) {
+      const ids = exportBatchIds;
+      exportBatchIds = null;
+      exportSelection(ids, expFmt, expSize, quality);
+    } else {
+      exportImage(expFmt, expSize, quality);
+    }
+  });
+  document.getElementById('prog-cancel').addEventListener('click', () => {
+    prog.cancelled = true;
+    document.getElementById('prog-cancel').textContent = 'Stopping…';
   });
 
   // ── Zoom & pan ──
